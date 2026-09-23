@@ -1,6 +1,8 @@
+import { z } from "zod";
+
 import { sendEmail } from "@/tools/send-email";
 
-const DEFAULT_EMAIL_RECIPIENTS = ["hi@cueva.io", "cris@kebo.app"];
+const RecipientsSchema = z.array(z.email()).min(1).max(20);
 
 interface ActionItem {
   id: string;
@@ -34,10 +36,16 @@ export async function POST(
 
     switch (action.type) {
       case "email": {
-        const recipients =
-          action.metadata.recipients && action.metadata.recipients.length > 0
-            ? action.metadata.recipients
-            : DEFAULT_EMAIL_RECIPIENTS;
+        const parsedRecipients = RecipientsSchema.safeParse(
+          action.metadata.recipients ?? []
+        );
+        if (!parsedRecipients.success) {
+          return Response.json(
+            { error: "Informe pelo menos um e-mail válido" },
+            { status: 400 }
+          );
+        }
+        const recipients = parsedRecipients.data;
 
         const result = await sendEmail({
           to: recipients,

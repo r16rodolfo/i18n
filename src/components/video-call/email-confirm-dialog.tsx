@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Loader2, Mail, Send, X } from "lucide-react";
+
+import type { EmailAction } from "@/lib/agent-schemas";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -13,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { EmailAction } from "@/lib/agent-schemas";
+import { Input } from "@/components/ui/input";
 
 interface EmailConfirmDialogProps {
   action: EmailAction | null;
@@ -32,8 +34,21 @@ export function EmailConfirmDialog({
 }: EmailConfirmDialogProps) {
   const [isExecuting, setIsExecuting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recipientsInput, setRecipientsInput] = useState("");
+
+  // Recipients are never filled in automatically: the user types or
+  // confirms them for every email.
+  useEffect(() => {
+    setRecipientsInput(action?.metadata.recipients?.join(", ") ?? "");
+    setError(null);
+  }, [action]);
 
   if (!action) return null;
+
+  const recipients = recipientsInput
+    .split(/[,;\s]+/)
+    .map((r) => r.trim())
+    .filter(Boolean);
 
   const handleConfirm = async () => {
     setIsExecuting(true);
@@ -43,7 +58,13 @@ export function EmailConfirmDialog({
       const response = await fetch(`/api/agent/${roomId}/actions/execute`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, meetingSummary }),
+        body: JSON.stringify({
+          action: {
+            ...action,
+            metadata: { ...action.metadata, recipients },
+          },
+          meetingSummary,
+        }),
       });
 
       const result = await response.json();
@@ -88,9 +109,14 @@ export function EmailConfirmDialog({
             <span className="text-xs text-white/50 uppercase tracking-wide">
               To
             </span>
-            <p className="text-sm text-white/80">
-              {action.metadata.recipients?.join(", ") || "No recipients specified"}
-            </p>
+            <Input
+              type="text"
+              placeholder="email@exemplo.com, outro@exemplo.com"
+              value={recipientsInput}
+              onChange={(e) => setRecipientsInput(e.target.value)}
+              disabled={isExecuting}
+              className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
+            />
           </div>
 
           {/* Subject */}
@@ -135,7 +161,7 @@ export function EmailConfirmDialog({
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={isExecuting}
+            disabled={isExecuting || recipients.length === 0}
             className="bg-blue-500 hover:bg-blue-600 text-white"
           >
             {isExecuting ? (

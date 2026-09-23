@@ -7,8 +7,6 @@ import {
 } from "@/lib/agent-schemas";
 import { chatModel } from "@/lib/ai";
 
-const DEFAULT_EMAIL_RECIPIENTS = ["hi@cueva.io", "cris@kebo.app"];
-
 const IntentDetectionSchema = z.object({
   hasEmailIntent: z.boolean(),
   confidence: z.enum(["high", "medium", "low"]),
@@ -69,7 +67,7 @@ If hasEmailIntent is true, generate a complete email action with:
 - Unique ID (format: email_intent_[timestamp])
 - Clear subject line based on context
 - Professional email body draft
-- For recipients, always use these default emails: ${DEFAULT_EMAIL_RECIPIENTS.join(", ")}`,
+- For recipients, only use email addresses explicitly said in the transcript; otherwise leave the list empty (the user fills them in before sending)`,
       temperature: 0.2,
     });
 

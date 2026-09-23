@@ -14,6 +14,17 @@ interface SendEmailResult {
   mocked?: boolean;
 }
 
+// Body and summary come from the LLM (fed by what people said), so they are
+// escaped before going into the HTML template.
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export async function sendEmail({
   to,
   subject,
@@ -47,14 +58,14 @@ export async function sendEmail({
             ? `
           <div style="background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 20px; border-left: 4px solid #000;">
             <h3 style="margin: 0 0 10px 0; font-size: 14px; text-transform: uppercase; color: #666;">Meeting Summary</h3>
-            <p style="margin: 0; color: #333; line-height: 1.6;">${meetingSummary}</p>
+            <p style="margin: 0; color: #333; line-height: 1.6;">${escapeHtml(meetingSummary)}</p>
           </div>
         `
             : ""
         }
 
         <div style="background: #fff; border-radius: 8px; padding: 20px;">
-          <p style="margin: 0; color: #333; line-height: 1.6; white-space: pre-wrap;">${body}</p>
+          <p style="margin: 0; color: #333; line-height: 1.6; white-space: pre-wrap;">${escapeHtml(body)}</p>
         </div>
       </div>
 
