@@ -1,101 +1,104 @@
 # R16 Meet
 
-A private video-call tool from R16 for meetings with clients in Paraguay:
-each person follows the meeting in their own language (Brazilian Portuguese ⇄
-Spanish). Based on the open-source project
+Ferramenta privada de videochamada da R16 para reuniões com clientes do
+Paraguai: cada pessoa acompanha a reunião no próprio idioma (português do
+Brasil ⇄ espanhol). Baseada no projeto aberto
 [crafter-station/i18n](https://github.com/crafter-station/i18n).
 
-**Infrastructure:** Vercel (hosting) · Supabase (database and, soon, login) ·
-Daily.co (video) · OpenAI (meeting agent) · translation provider configurable
-(`none` or Palabra for now).
+**Infraestrutura:** Vercel (hospedagem) · Supabase (banco de dados e, em breve,
+login) · Daily.co (vídeo) · OpenAI (agente da reunião) · provedor de tradução
+configurável (por enquanto `none` ou Palabra).
 
-Architecture details for anyone (or any AI) working on the code: see
+Detalhes da arquitetura para quem (ou qual IA) for mexer no código: veja o
 [AGENTS.md](AGENTS.md).
 
 ---
 
-## Running on your computer
+## Rodar no seu computador
 
-### 1. Install what you need (once)
+### 1. Instale o necessário (uma vez só)
 
-- **Node.js** 20 or newer: <https://nodejs.org>
-- **Bun** (runs the project):
+- **Node.js** 20 ou mais novo: <https://nodejs.org>
+- **Bun** (roda o projeto):
   ```bash
   npm install -g bun
   ```
-  Check with `bun --version`.
+  Para conferir, rode `bun --version`.
 
-### 2. Get the keys
+### 2. Pegue as chaves
 
-| Service | What to do | Variable in `.env.local` |
+| Serviço | O que fazer | Variável no `.env.local` |
 |---|---|---|
-| **Supabase** | Create a project (region **South America (São Paulo)**). Click **Connect** → copy the *Transaction pooler* URL (port 6543) and the *Session pooler* URL (port 5432). Replace `[YOUR-PASSWORD]` with the database password. | `DATABASE_URL` (6543) and `DATABASE_MIGRATION_URL` (5432) |
-| **Daily.co** | dashboard.daily.co → *Developers* → copy the API key. | `DAILY_API_KEY` |
-| **OpenAI** | platform.openai.com → *API keys* → create a key. | `OPENAI_API_KEY` |
-| Resend *(optional)* | Without it, emails are only simulated. | `RESEND_API_KEY`, `RESEND_FROM_EMAIL` |
-| Palabra *(optional)* | Only if you want to test with `TRANSLATION_PROVIDER=palabra`. | `PALABRA_CLIENT_ID`, `PALABRA_CLIENT_SECRET` |
+| **Supabase** | Crie um projeto (região **South America (São Paulo)**). Clique em **Connect** e copie a URL do *Transaction pooler* (porta 6543) e a do *Session pooler* (porta 5432). Troque `[YOUR-PASSWORD]` pela senha do banco. | `DATABASE_URL` (6543) e `DATABASE_MIGRATION_URL` (5432) |
+| **Daily.co** | dashboard.daily.co → *Developers* → copie a API key. | `DAILY_API_KEY` |
+| **OpenAI** | platform.openai.com → *API keys* → crie uma chave. | `OPENAI_API_KEY` |
+| Resend *(opcional)* | Sem ela, os e-mails são só simulados. | `RESEND_API_KEY`, `RESEND_FROM_EMAIL` |
+| Palabra *(opcional)* | Só se quiser testar com `TRANSLATION_PROVIDER=palabra`. | `PALABRA_CLIENT_ID`, `PALABRA_CLIENT_SECRET` |
 
 ### 3. Configure
 
-In the project folder:
+Na pasta do projeto:
 
 ```bash
 bun install
 ```
 
-Copy the example file and fill in the keys (in PowerShell: `Copy-Item .env.example .env.local`):
+Copie o arquivo de exemplo e preencha as chaves:
 
 ```bash
-cp .env.example .env.local
+Copy-Item .env.example .env.local
 ```
 
-Every variable is explained inside `.env.example`. The `.env.local` file
-**never** goes to GitHub (it is in `.gitignore`).
+(Esse é o comando do PowerShell. No Mac ou Linux, use `cp .env.example .env.local`.)
 
-### 4. Create the tables in the database (once, and whenever the schema changes)
+Cada variável está explicada dentro do `.env.example`. O arquivo `.env.local`
+**nunca** vai para o GitHub (ele está no `.gitignore`).
+
+### 4. Crie as tabelas no banco (uma vez, e sempre que o esquema mudar)
 
 ```bash
 bun db:migrate
 ```
 
-In Supabase → *Table Editor* the tables `rooms`, `participants` and
-`transcripts` should now appear, each with the "RLS enabled" label.
+Depois disso, em Supabase → *Table Editor* devem aparecer as tabelas
+`rooms`, `participants` e `transcripts`, cada uma com a etiqueta
+"RLS enabled".
 
-### 5. Start
+### 5. Inicie
 
 ```bash
 bun dev
 ```
 
-Open <http://localhost:3000>.
+Abra <http://localhost:3000>.
 
-### How to test
+### Como testar
 
-1. On the home page, click **Start Call** (or **Create Room**). You will be taken to the room
-   page.
-2. Fill in your name and join. Allow camera and microphone.
-3. Copy the room link and open it in **another browser** (or on your
-   phone/another computer), with a different name.
-4. Check that one person sees **and hears** the other. Use headphones to
-   avoid echo if both are on the same computer.
-5. In Supabase → *Table Editor* → `rooms` and `participants`, the room and
-   the two participants should appear.
+1. Na página inicial, clique em **Start Call** (ou **Create Room**). Você vai
+   para a página da sala.
+2. Preencha seu nome e entre. Permita câmera e microfone.
+3. Copie o link da sala e abra em **outro navegador** (ou no celular/outro
+   computador), com outro nome.
+4. Confira que um vê **e ouve** o outro. Use fone para evitar eco se os dois
+   estiverem no mesmo computador.
+5. Em Supabase → *Table Editor* → `rooms` e `participants`, devem aparecer a
+   sala e os dois participantes.
 
-If something fails, the error shows up in the terminal where `bun dev` is
-running.
+Se algo der errado, a mensagem de erro aparece no terminal onde o `bun dev`
+está rodando.
 
 ---
 
-## Useful commands
+## Comandos úteis
 
-| Command | What it does |
+| Comando | O que faz |
 |---|---|
-| `bun dev` | Starts the app on your computer |
-| `bun run build` | Checks that everything compiles (the same thing Vercel does) |
-| `bun db:migrate` | Applies database changes |
-| `bun db:studio` | Opens a visual editor for the database |
-| `bun lint` | Checks code style (Biome) |
+| `bun dev` | Inicia o app no seu computador |
+| `bun run build` | Confere se tudo compila (é o mesmo que a Vercel faz) |
+| `bun db:migrate` | Aplica as mudanças no banco de dados |
+| `bun db:studio` | Abre um editor visual do banco |
+| `bun lint` | Confere o estilo do código (Biome) |
 
-## License
+## Licença
 
-MIT (original project by Crafter Station).
+MIT (projeto original da Crafter Station).
