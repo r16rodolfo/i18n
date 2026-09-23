@@ -9,6 +9,7 @@ CREATE TABLE "participants" (
 	"left_at" timestamp
 );
 --> statement-breakpoint
+ALTER TABLE "participants" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "rooms" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"daily_room_name" text NOT NULL,
@@ -19,6 +20,7 @@ CREATE TABLE "rooms" (
 	CONSTRAINT "rooms_daily_room_name_unique" UNIQUE("daily_room_name")
 );
 --> statement-breakpoint
+ALTER TABLE "rooms" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "transcripts" (
 	"id" text PRIMARY KEY NOT NULL,
 	"room_id" uuid NOT NULL,
@@ -30,14 +32,6 @@ CREATE TABLE "transcripts" (
 	"timestamp" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "users" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"clerk_id" text NOT NULL,
-	"email" text NOT NULL,
-	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp DEFAULT now() NOT NULL,
-	CONSTRAINT "users_clerk_id_unique" UNIQUE("clerk_id")
-);
---> statement-breakpoint
+ALTER TABLE "transcripts" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "participants" ADD CONSTRAINT "participants_room_id_rooms_id_fk" FOREIGN KEY ("room_id") REFERENCES "public"."rooms"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "transcripts" ADD CONSTRAINT "transcripts_room_id_rooms_id_fk" FOREIGN KEY ("room_id") REFERENCES "public"."rooms"("id") ON DELETE cascade ON UPDATE no action;

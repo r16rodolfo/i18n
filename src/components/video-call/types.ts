@@ -1,4 +1,5 @@
 import type { LanguageCode } from "@/lib/languages";
+import type { TranslationProvider } from "@/lib/translation-providers";
 
 export interface VideoCallProps {
   roomUrl: string;
@@ -8,6 +9,7 @@ export interface VideoCallProps {
   username: string;
   visitorId: string;
   roomId: string;
+  translationProvider: TranslationProvider;
 }
 
 export interface TranscriptEntry {

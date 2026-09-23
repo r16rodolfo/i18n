@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { participants, rooms } from "@/db/schema";
+import { getActiveTranslationProvider } from "@/lib/translation-providers";
 
 export async function POST(
   req: Request,
@@ -78,6 +79,7 @@ export async function POST(
       token,
       roomUrl: room.dailyRoomUrl,
       dailyRoomName: room.dailyRoomName,
+      translationProvider: await getActiveTranslationProvider(),
     });
   } catch (error) {
     console.error("Error joining room:", error);

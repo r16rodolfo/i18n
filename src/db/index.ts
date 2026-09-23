@@ -1,29 +1,33 @@
-import { neon } from "@neondatabase/serverless";
-import { drizzle, type NeonHttpDatabase } from "drizzle-orm/neon-http";
+import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 
 import * as schema from "./schema";
 
-let _db: NeonHttpDatabase<typeof schema> | null = null;
+type Database = PostgresJsDatabase<typeof schema>;
 
-export function getDb() {
+let _db: Database | null = null;
+
+export function getDb(): Database {
   if (!_db) {
-    const sql = neon(process.env.DATABASE_URL!);
-    _db = drizzle(sql, { schema });
+    const url = process.env.DATABASE_URL;
+    if (!url) {
+      throw new Error("DATABASE_URL is not set");
+    }
+    // Supabase pooler in transaction mode (port 6543) does not support
+    // prepared statements, so they must be disabled.
+    const client = postgres(url, { prepare: false, max: 5 });
+    _db = drizzle(client, { schema });
   }
   return _db;
 }
 
-// For backwards compatibility
+// Lazy proxy so importing this module never opens a connection (e.g. at build time)
 export const db = {
   get query() {
     return getDb().query;
   },
-  insert: (...args: Parameters<NeonHttpDatabase<typeof schema>["insert"]>) =>
-    getDb().insert(...args),
-  update: (...args: Parameters<NeonHttpDatabase<typeof schema>["update"]>) =>
-    getDb().update(...args),
-  delete: (...args: Parameters<NeonHttpDatabase<typeof schema>["delete"]>) =>
-    getDb().delete(...args),
-  select: (...args: Parameters<NeonHttpDatabase<typeof schema>["select"]>) =>
-    getDb().select(...args),
+  insert: (...args: Parameters<Database["insert"]>) => getDb().insert(...args),
+  update: (...args: Parameters<Database["update"]>) => getDb().update(...args),
+  delete: (...args: Parameters<Database["delete"]>) => getDb().delete(...args),
+  select: (...args: Parameters<Database["select"]>) => getDb().select(...args),
 };

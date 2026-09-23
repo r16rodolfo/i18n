@@ -2,8 +2,7 @@ import { generateObject } from "ai";
 import { z } from "zod";
 
 import { ActionsRequestSchema } from "@/lib/agent-schemas";
-
-const DEFAULT_EMAIL_RECIPIENTS = ["hi@cueva.io", "cris@kebo.app"];
+import { chatModel } from "@/lib/ai";
 
 const ActionItemSchema = z.object({
   actions: z.array(
@@ -46,7 +45,7 @@ export async function POST(
       .join("\n");
 
     const result = await generateObject({
-      model: "openai/gpt-5.1",
+      model: chatModel,
       schema: ActionItemSchema,
       prompt: `Analyze this meeting transcript and extract action items.
 
@@ -59,7 +58,7 @@ Extract:
 3. Emails to be sent (summaries, updates to stakeholders)
 
 For each action, generate a unique ID (use format: action_1, action_2, etc).
-For email actions, always use these recipients: ${DEFAULT_EMAIL_RECIPIENTS.join(", ")}. Include suggested subject and brief body in metadata.
+For email actions, only list recipient email addresses that were explicitly said in the transcript; otherwise leave recipients empty (the user fills them in before sending). Include suggested subject and brief body in metadata.
 Provide a brief meeting summary (2-3 sentences).
 
 Prioritize actions based on urgency mentioned in the conversation.`,

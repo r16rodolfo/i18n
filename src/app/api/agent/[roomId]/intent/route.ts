@@ -5,8 +5,7 @@ import {
   ActionsRequestSchema,
   EmailActionSchema,
 } from "@/lib/agent-schemas";
-
-const DEFAULT_EMAIL_RECIPIENTS = ["hi@cueva.io", "cris@kebo.app"];
+import { chatModel } from "@/lib/ai";
 
 const IntentDetectionSchema = z.object({
   hasEmailIntent: z.boolean(),
@@ -46,7 +45,7 @@ export async function POST(
       .join("\n");
 
     const result = await generateObject({
-      model: "openai/gpt-5.1",
+      model: chatModel,
       schema: IntentDetectionSchema,
       prompt: `Analyze these recent meeting messages to detect if participants are discussing sending an email.
 
@@ -68,7 +67,7 @@ If hasEmailIntent is true, generate a complete email action with:
 - Unique ID (format: email_intent_[timestamp])
 - Clear subject line based on context
 - Professional email body draft
-- For recipients, always use these default emails: ${DEFAULT_EMAIL_RECIPIENTS.join(", ")}`,
+- For recipients, only use email addresses explicitly said in the transcript; otherwise leave the list empty (the user fills them in before sending)`,
       temperature: 0.2,
     });
 
