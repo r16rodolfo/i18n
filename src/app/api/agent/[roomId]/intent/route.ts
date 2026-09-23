@@ -5,6 +5,7 @@ import {
   ActionsRequestSchema,
   EmailActionSchema,
 } from "@/lib/agent-schemas";
+import { chatModel } from "@/lib/ai";
 
 const DEFAULT_EMAIL_RECIPIENTS = ["hi@cueva.io", "cris@kebo.app"];
 
@@ -46,7 +47,7 @@ export async function POST(
       .join("\n");
 
     const result = await generateObject({
-      model: "openai/gpt-5.1",
+      model: chatModel,
       schema: IntentDetectionSchema,
       prompt: `Analyze these recent meeting messages to detect if participants are discussing sending an email.
 

@@ -2,6 +2,7 @@ import { generateObject } from "ai";
 import { z } from "zod";
 
 import { ActionsRequestSchema } from "@/lib/agent-schemas";
+import { chatModel } from "@/lib/ai";
 
 const DEFAULT_EMAIL_RECIPIENTS = ["hi@cueva.io", "cris@kebo.app"];
 
@@ -46,7 +47,7 @@ export async function POST(
       .join("\n");
 
     const result = await generateObject({
-      model: "openai/gpt-5.1",
+      model: chatModel,
       schema: ActionItemSchema,
       prompt: `Analyze this meeting transcript and extract action items.
 

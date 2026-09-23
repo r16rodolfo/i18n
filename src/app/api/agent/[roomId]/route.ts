@@ -6,6 +6,7 @@ import {
 } from "ai";
 
 import { ChatRequestSchema } from "@/lib/agent-schemas";
+import { chatModel } from "@/lib/ai";
 import { webSearchTool } from "@/tools/web-search";
 
 export const maxDuration = 30;
@@ -77,7 +78,7 @@ Guidelines:
 - Respond in the same language the user asks the question`;
 
     const result = streamText({
-      model: "openai/gpt-5.1",
+      model: chatModel,
       system: systemPrompt,
       messages: await convertToModelMessages(formattedMessages),
       tools: {
