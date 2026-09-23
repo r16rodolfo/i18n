@@ -8,7 +8,10 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-// Existing rooms table (from database)
+// RLS is enabled on every table with no policies: the app talks to the
+// database only from the server (as the table owner), so Supabase's public
+// Data API (anon key) cannot read or write these tables.
+
 export const rooms = pgTable(
   "rooms",
   {
@@ -20,22 +23,8 @@ export const rooms = pgTable(
     expiresAt: timestamp("expires_at"),
   },
   (table) => [unique("rooms_daily_room_name_unique").on(table.dailyRoomName)]
-);
+).enableRLS();
 
-// Existing users table (from database)
-export const users = pgTable(
-  "users",
-  {
-    id: uuid("id").defaultRandom().primaryKey().notNull(),
-    clerkId: text("clerk_id").notNull(),
-    email: text("email").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  },
-  (table) => [unique("users_clerk_id_unique").on(table.clerkId)]
-);
-
-// NEW: Participants table for i18n app
 export const participants = pgTable("participants", {
   id: text("id").primaryKey(), // visitorId + roomId
   visitorId: text("visitor_id").notNull(),
@@ -47,9 +36,8 @@ export const participants = pgTable("participants", {
   email: text("email"),
   joinedAt: timestamp("joined_at").defaultNow().notNull(),
   leftAt: timestamp("left_at"),
-});
+}).enableRLS();
 
-// NEW: Transcripts table for i18n app
 export const transcripts = pgTable("transcripts", {
   id: text("id").primaryKey(), // nanoid(12)
   roomId: uuid("room_id")
@@ -61,7 +49,7 @@ export const transcripts = pgTable("transcripts", {
   originalLanguage: text("original_language").notNull(),
   translatedTexts: jsonb("translated_texts").$type<Record<string, string>>(),
   timestamp: timestamp("timestamp").defaultNow().notNull(),
-});
+}).enableRLS();
 
 // Relations
 export const roomsRelations = relations(rooms, ({ many }) => ({
