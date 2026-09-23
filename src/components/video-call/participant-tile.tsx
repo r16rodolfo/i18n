@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-import { useVideoTrack } from "@daily-co/daily-react";
+import { useAudioTrack, useVideoTrack } from "@daily-co/daily-react";
 
 import { getLanguageFlag, type LanguageCode } from "@/lib/languages";
 
@@ -11,6 +11,8 @@ interface ParticipantTileProps {
   username?: string;
   isLocal?: boolean;
   preferredLanguage?: LanguageCode;
+  /** Play this participant's original voice (off when Palabra plays a translated voice instead) */
+  playAudio?: boolean;
 }
 
 export function ParticipantTile({
@@ -18,9 +20,12 @@ export function ParticipantTile({
   username,
   isLocal,
   preferredLanguage,
+  playAudio = false,
 }: ParticipantTileProps) {
   const videoTrack = useVideoTrack(sessionId);
+  const audioTrack = useAudioTrack(sessionId);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -28,6 +33,13 @@ export function ParticipantTile({
     if (!video || !track) return;
     video.srcObject = new MediaStream([track]);
   }, [videoTrack?.persistentTrack]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    const track = audioTrack?.persistentTrack;
+    if (!audio || !track) return;
+    audio.srcObject = new MediaStream([track]);
+  }, [audioTrack?.persistentTrack]);
 
   return (
     <div className="relative bg-neutral-800 rounded-xl overflow-hidden">
@@ -38,6 +50,11 @@ export function ParticipantTile({
         muted={isLocal}
         className="w-full h-full object-cover"
       />
+
+      {!isLocal && playAudio && (
+        // biome-ignore lint/a11y/useMediaCaption: live call audio, captions are shown separately
+        <audio ref={audioRef} autoPlay playsInline />
+      )}
 
       <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-lg text-white text-sm">
         {username || sessionId.slice(0, 6)}

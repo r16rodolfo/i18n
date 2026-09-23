@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { ArrowRight, Loader2 } from "lucide-react";
 
 import { getLanguageName, type LanguageCode } from "@/lib/languages";
+import type { TranslationProvider } from "@/lib/translation-providers";
 
 import { LanguageSelector } from "@/components/language-selector";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,8 @@ export default function RoomPage() {
   const [isJoined, setIsJoined] = useState(false);
   const [roomUrl, setRoomUrl] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [translationProvider, setTranslationProvider] =
+    useState<TranslationProvider>("none");
   const [error, setError] = useState<string | null>(null);
 
   // Load language preferences from localStorage on mount
@@ -72,6 +75,7 @@ export default function RoomPage() {
 
       setRoomUrl(data.roomUrl);
       setToken(data.token);
+      setTranslationProvider(data.translationProvider ?? "none");
       setIsJoined(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to join room");
@@ -91,6 +95,7 @@ export default function RoomPage() {
         username={username}
         visitorId={visitorId}
         roomId={roomId}
+        translationProvider={translationProvider}
       />
     );
   }

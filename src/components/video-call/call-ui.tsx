@@ -27,6 +27,7 @@ export function CallUI({
   preferredLanguage,
   username,
   roomId,
+  translationProvider,
 }: VideoCallProps) {
   const daily = useDaily();
   const localParticipant = useLocalParticipant();
@@ -36,6 +37,10 @@ export function CallUI({
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+
+  // With Palabra, others are heard only through the translated voice.
+  // Otherwise the original audio of each participant is played.
+  const usePalabra = translationProvider === "palabra";
 
   const {
     transcripts,
@@ -67,13 +72,15 @@ export function CallUI({
         // Disable auto-subscribe so we can control audio/video separately
         daily.setSubscribeToTracksAutomatically(false);
 
-        // Subscribe to video + audio, but we won't play raw remote audio
-        // (Palabra handles translation + TTS playback instead)
+        // Subscribe to video + audio. Remote audio is played by the tiles,
+        // unless Palabra is active (it plays the translated voice instead).
         daily.updateParticipants({
           "*": { setSubscribedTracks: { video: true, audio: true } },
         });
 
-        await startTranscription();
+        if (usePalabra) {
+          await startTranscription();
+        }
         setIsJoining(false);
         setShowShareModal(true);
       } catch (error) {
@@ -90,7 +97,14 @@ export function CallUI({
         daily.leave();
       }
     };
-  }, [daily, roomUrl, token, startTranscription, stopTranscription]);
+  }, [
+    daily,
+    roomUrl,
+    token,
+    usePalabra,
+    startTranscription,
+    stopTranscription,
+  ]);
 
   // Feed remote audio tracks to Palabra for translation
   useDailyEvent("track-started", (event) => {
@@ -192,7 +206,7 @@ export function CallUI({
 
           {/* Remote participants */}
           {participantIds.map((id) => (
-            <ParticipantTile key={id} sessionId={id} />
+            <ParticipantTile key={id} sessionId={id} playAudio={!usePalabra} />
           ))}
         </div>
       </div>
@@ -202,7 +216,7 @@ export function CallUI({
         preferredLanguage={preferredLanguage}
         transcripts={transcripts}
         liveTranscript={liveTranscript}
-        transcriptionStatus={transcriptionStatus}
+        transcriptionStatus={usePalabra ? transcriptionStatus : "stopped"}
         roomId={roomId}
       />
 
