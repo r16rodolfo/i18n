@@ -10,6 +10,7 @@ import { CopyInviteButton } from "@/components/copy-invite-button";
 import { TeamHeader } from "@/components/team-header";
 import { Button } from "@/components/ui/button";
 
+import { DeleteRoomButton } from "./delete-room-button";
 import { NewMeetingButton } from "./new-meeting-button";
 
 export const metadata = { title: "R16 Meet" };
@@ -84,6 +85,10 @@ export default async function HomePage() {
                     >
                       <Link href={`/${room.dailyRoomName}`}>Entrar</Link>
                     </Button>
+                    {(room.createdBy === member.userId ||
+                      member.role === "admin") && (
+                      <DeleteRoomButton roomName={room.dailyRoomName} />
+                    )}
                   </div>
                 </li>
               ))}
