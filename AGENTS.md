@@ -15,7 +15,9 @@ say how to test them.
 ## Tech Stack
 
 - **Runtime**: Bun (use `bun` instead of `npm`/`yarn`/`pnpm`)
-- **Framework**: Next.js 16 with App Router, hosted on **Vercel**
+- **Framework**: Next.js 16 with App Router, hosted on **Vercel** (project
+  `r16-meet` in the `r16bits` team, functions pinned to `gru1` São Paulo in
+  `vercel.json` to sit next to the Supabase `sa-east-1` database)
 - **Language**: TypeScript (strict mode)
 - **Styling**: Tailwind CSS v4 with shadcn/ui (new-york style)
 - **Database**: Drizzle ORM + **Supabase Postgres** via `postgres` (postgres-js)
@@ -82,8 +84,10 @@ admin panel settings from the DB). Currently:
 - `palabra`: Palabra.ai speech-to-speech (`use-transcription.ts`); remote
   original audio is not played, only Palabra's TTS
 
-Selected by `TRANSLATION_PROVIDER` for now; falls back to `none` when keys
-are missing. To add a provider: extend `TRANSLATION_PROVIDERS`, add its
+**Palabra is a permanent option; never remove it.** The owner wants to
+choose among several providers (enable/disable them in the admin panel,
+phase 2). Selected by `TRANSLATION_PROVIDER` for now; falls back to `none`
+when keys are missing. To add a provider: extend `TRANSLATION_PROVIDERS`, add its
 `isConfigured` check, and branch in `CallUI`.
 
 ### Database security
@@ -95,7 +99,7 @@ every new table.
 ### Known gaps (planned)
 - Phase 2: Supabase Auth, invite links for guests, private Daily rooms,
   replace `/api/palabra-auth` (still returns the Palabra secret when Palabra
-  is active) with a server-side session proxy, admin panel for providers,
+  is active) with a server-side session proxy (Palabra itself stays), admin panel for providers,
   agent routes reading transcripts from the DB instead of the client.
 - Phase 3: translated captions + original voice (streaming STT + LLM with a
   glossary), transcripts persisted in `transcripts`.
@@ -117,7 +121,7 @@ src/
 │   ├── api/
 │   │   ├── rooms/              # create room, join room (Daily token)
 │   │   ├── agent/[roomId]/     # AI agent: chat, intent, actions, execute
-│   │   └── palabra-auth/       # temporary, removed in phase 2
+│   │   └── palabra-auth/       # insecure, becomes a server-side proxy in phase 2
 │   ├── [roomId]/               # join form + call; agent/ (post-meeting page)
 │   ├── layout.tsx
 │   ├── page.tsx                # landing / create room
