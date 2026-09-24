@@ -15,12 +15,20 @@ import { uiLangFor, uiText } from "@/lib/ui-text";
 import { AgentPanel } from "@/components/agent-panel";
 
 import { CallControls } from "./call-controls";
+import { CaptionsBar } from "./captions-bar";
 import { EmailConfirmDialog } from "./email-confirm-dialog";
+import { liveTranscriptOf, useCaptions } from "./hooks/use-captions";
+import { useFloor } from "./hooks/use-floor";
 import { useIntentDetection } from "./hooks/use-intent-detection";
+import { useScribe } from "./hooks/use-scribe";
+import { useSoniox } from "./hooks/use-soniox";
 import { useTranscription } from "./hooks/use-transcription";
 import { ParticipantTile } from "./participant-tile";
 import { ShareModal } from "./share-modal";
 import type { VideoCallProps } from "./types";
+
+// Silence (in ms) after which whoever has the floor gives it back
+const FLOOR_AUTO_RELEASE_MS = 8000;
 
 export function CallUI({
   roomUrl,
@@ -28,6 +36,7 @@ export function CallUI({
   spokenLanguage,
   preferredLanguage,
   username,
+  visitorId,
   roomId,
   translationProvider,
   inviteToken,
@@ -44,10 +53,36 @@ export function CallUI({
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  // Captions under the video: each person turns them on/off (remembered)
+  const [showCaptions, setShowCaptions] = useState(true);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("showCaptions") === "false") {
+        setShowCaptions(false);
+      }
+    } catch {
+      // Storage blocked: keep them on
+    }
+  }, []);
+  const toggleCaptions = useCallback(() => {
+    setShowCaptions((current) => {
+      try {
+        localStorage.setItem("showCaptions", String(!current));
+      } catch {
+        // Storage blocked: only for this call
+      }
+      return !current;
+    });
+  }, []);
 
   // With Palabra, others are heard only through the translated voice.
   // Otherwise the original audio of each participant is played.
   const usePalabra = translationProvider === "palabra";
+  // With ElevenLabs or Soniox, each person's mic is transcribed, translated
+  // and shared as captions; everyone hears the original voice
+  const useElevenLabs = translationProvider === "elevenlabs";
+  const useSonioxEngine = translationProvider === "soniox";
+  const liveCaptions = useElevenLabs || useSonioxEngine;
 
   const {
     transcripts,
@@ -73,11 +108,70 @@ export function CallUI({
   const translatedVoiceActive = usePalabra && transcriptionStatus === "active";
   const originalVolume = translatedVoiceActive ? 0.15 : 1;
 
+  // Captions shared through Daily, floor control, your mic
+  const inCall = !isJoining;
+  const captions = useCaptions({
+    daily,
+    ready: inCall && liveCaptions,
+    myName: username,
+    spokenLanguage,
+    preferredLanguage,
+    roomId,
+    inviteToken,
+    visitorId,
+  });
+  const floor = useFloor({
+    daily,
+    enabledByDefault: liveCaptions,
+    myName: username,
+    ready: inCall && liveCaptions,
+  });
+  const scribe = useScribe({
+    enabled: useElevenLabs,
+    roomId,
+    inviteToken,
+    language: spokenLanguage,
+    onPartial: captions.publishPartial,
+    onCommitted: captions.publishFinal,
+  });
+  const soniox = useSoniox({
+    enabled: useSonioxEngine,
+    roomId,
+    inviteToken,
+    language: spokenLanguage,
+    getTargetLanguage: captions.getTargetLanguage,
+    onPartial: captions.showPartial,
+    onPiece: captions.publishTranslatedPiece,
+  });
+  // The engine that listens to your mic in this meeting
+  const engine = useSonioxEngine ? soniox : scribe;
+  const floorActive = liveCaptions && floor.floorMode;
+  // The transcript panel: everyone in ElevenLabs meetings (in their own
+  // language); the AI agent inside it stays team-only
+  const showTranscriptPanel = isTeamMember || liveCaptions;
+  // Is your mic open? With the floor control on, only while you have the
+  // floor; otherwise it follows the mute button.
+  const micOpen = floorActive ? floor.iHold : !isMuted;
+
+  // What the agent panel and the e-mail detection read
+  const callTranscripts = liveCaptions ? captions.entries : transcripts;
+  // Only the phrase still being spoken: finished ones are already in the list
+  const callLiveTranscript = liveCaptions
+    ? liveTranscriptOf(captions.live)
+    : liveTranscript;
+  const callTranscriptionStatus = liveCaptions
+    ? engine.status === "error"
+      ? "error"
+      : "active"
+    : usePalabra
+      ? transcriptionStatus
+      : "stopped";
+
   // Proactive intent detection for email actions (team only: the agent
   // routes spend OpenAI credits and can send e-mail)
   const { detectedEmail, dismissEmail } = useIntentDetection({
     roomId,
-    transcripts,
+    transcripts: callTranscripts,
     enabled: !isJoining && isTeamMember,
   });
 
@@ -162,14 +256,34 @@ export function CallUI({
     removeRemoteTrack(participant.session_id);
   });
 
-  // Mic toggle - controls both Daily.co (voice to others) and Palabra (local transcription)
+  // Open/close your mic in the call, and the ElevenLabs transcription with it
+  const { start: startEngine, stop: stopEngine } = engine;
+  useEffect(() => {
+    if (!daily || isJoining) return;
+    daily.setLocalAudio(micOpen);
+    if (!liveCaptions) return;
+    if (micOpen) startEngine();
+    else stopEngine();
+  }, [daily, isJoining, micOpen, liveCaptions, startEngine, stopEngine]);
+
+  // Give the floor back after a long silence, so nobody stays locked out
+  const { iHold, release: releaseFloor } = floor;
+  const { getSilenceMs } = engine;
+  useEffect(() => {
+    if (!floorActive || !iHold) return;
+    const timer = setInterval(() => {
+      if (getSilenceMs() > FLOOR_AUTO_RELEASE_MS) releaseFloor();
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [floorActive, iHold, getSilenceMs, releaseFloor]);
+
+  // Mic toggle (when the floor control is off): Daily follows micOpen above;
+  // Palabra transcribes its own copy of the mic
   const toggleMute = useCallback(() => {
-    if (!daily) return;
     const newMutedState = !isMuted;
-    daily.setLocalAudio(!newMutedState);
     setPalabraMuted(newMutedState);
     setIsMuted(newMutedState);
-  }, [daily, isMuted, setPalabraMuted]);
+  }, [isMuted, setPalabraMuted]);
 
   const toggleVideo = useCallback(() => {
     if (!daily) return;
@@ -205,7 +319,7 @@ export function CallUI({
       )}
 
       {/* Video grid - takes remaining space */}
-      <div className="flex-1 p-4 pb-0 overflow-hidden">
+      <div className="relative flex-1 p-4 pb-0 overflow-hidden">
         <div
           className={`grid gap-4 h-full ${
             participantIds.length === 0
@@ -234,16 +348,37 @@ export function CallUI({
             />
           ))}
         </div>
+
+        {liveCaptions && (
+          <CaptionsBar
+            caption={showCaptions ? captions.live : null}
+            floorStatus={
+              floorActive
+                ? {
+                    iHold: floor.iHold,
+                    holderName: floor.iHold
+                      ? null
+                      : (floor.holder?.name ?? null),
+                  }
+                : null
+            }
+            hasError={engine.status === "error"}
+            raised={showTranscriptPanel}
+            uiLang={uiLang}
+          />
+        )}
       </div>
 
-      {/* Floating agent panel (team only) */}
-      {isTeamMember && (
+      {/* Floating transcript panel (+ AI agent for the team) */}
+      {showTranscriptPanel && (
         <AgentPanel
           preferredLanguage={preferredLanguage}
-          transcripts={transcripts}
-          liveTranscript={liveTranscript}
-          transcriptionStatus={usePalabra ? transcriptionStatus : "stopped"}
+          transcripts={callTranscripts}
+          liveTranscript={callLiveTranscript}
+          transcriptionStatus={callTranscriptionStatus}
           roomId={roomId}
+          showAgent={isTeamMember}
+          uiLang={uiLang}
         />
       )}
 
@@ -256,6 +391,31 @@ export function CallUI({
         onToggleVideo={toggleVideo}
         onLeave={leaveCall}
         onShowShare={invitePath ? () => setShowShareModal(true) : undefined}
+        floor={
+          floorActive
+            ? {
+                iHold: floor.iHold,
+                otherHolderName: floor.iHold
+                  ? null
+                  : (floor.holder?.name ?? null),
+                onTake: floor.take,
+                onRelease: floor.release,
+              }
+            : undefined
+        }
+        captionsToggle={
+          liveCaptions
+            ? { enabled: showCaptions, onToggle: toggleCaptions }
+            : undefined
+        }
+        floorToggle={
+          liveCaptions && isTeamMember
+            ? {
+                enabled: floor.floorMode,
+                onToggle: () => floor.setFloorMode(!floor.floorMode),
+              }
+            : undefined
+        }
         uiLang={uiLang}
       />
 

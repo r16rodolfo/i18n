@@ -23,6 +23,8 @@ export interface TranscriptEntry {
   original: string;
   translated: string;
   timestamp: Date;
+  // Said in another language and not translated yet (shown as "translating")
+  pending?: boolean;
 }
 
 export interface LiveTranscript {

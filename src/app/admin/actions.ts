@@ -8,7 +8,9 @@ import { z } from "zod";
 import { db } from "@/db";
 import { appSettings, teamMembers } from "@/db/schema";
 import { getTeamMember } from "@/lib/auth";
+import { verifyElevenLabsKey } from "@/lib/elevenlabs";
 import { verifyPalabraKeys } from "@/lib/palabra";
+import { verifySonioxKey } from "@/lib/soniox";
 import {
   isConfigured,
   isTranslationProvider,
@@ -37,6 +39,12 @@ export async function setTranslationProvider(formData: FormData) {
   // every call would go silent (the original voice is replaced).
   if (provider === "palabra" && !(await verifyPalabraKeys())) {
     redirect("/admin?erro=chaves-palabra");
+  }
+  if (provider === "elevenlabs" && !(await verifyElevenLabsKey())) {
+    redirect("/admin?erro=chave-elevenlabs");
+  }
+  if (provider === "soniox" && !(await verifySonioxKey())) {
+    redirect("/admin?erro=chave-soniox");
   }
 
   await db

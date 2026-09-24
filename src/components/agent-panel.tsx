@@ -21,6 +21,7 @@ import {
   useDragControls,
 } from "motion/react";
 
+import { type UiLang, type UiText, uiText } from "@/lib/ui-text";
 import { cn } from "@/lib/utils";
 
 import type {
@@ -43,6 +44,9 @@ interface AgentPanelProps {
   liveTranscript: LiveTranscript | null;
   transcriptionStatus: TranscriptionStatus;
   roomId: string;
+  // The AI agent (chat) is for the team only; guests get the transcript
+  showAgent: boolean;
+  uiLang: UiLang;
 }
 
 export function AgentPanel({
@@ -51,7 +55,10 @@ export function AgentPanel({
   liveTranscript,
   transcriptionStatus,
   roomId,
+  showAgent,
+  uiLang,
 }: AgentPanelProps) {
+  const t = uiText(uiLang);
   const [isExpanded, setIsExpanded] = useState(true);
   const [isMinimized, setIsMinimized] = useState(false);
   const [inputValue, setInputValue] = useState("");
@@ -296,8 +303,12 @@ export function AgentPanel({
                 transition={{ type: "spring", stiffness: 500, damping: 30 }}
                 className="flex items-center gap-2 px-4 py-2.5 bg-black/70 backdrop-blur-xl border border-white/10 rounded-full text-white text-sm hover:bg-black/80 transition-colors shadow-2xl select-none cursor-grab active:cursor-grabbing"
               >
-                <Sparkles className="w-4 h-4" />
-                <span>Show Agent</span>
+                {showAgent ? (
+                  <Sparkles className="w-4 h-4" />
+                ) : (
+                  <Languages className="w-4 h-4" />
+                )}
+                <span>{showAgent ? t.showPanel : t.showTranscript}</span>
                 <ChevronUp className="w-4 h-4" />
               </motion.button>
             ) : (
@@ -328,7 +339,7 @@ export function AgentPanel({
                   <div className="flex items-center justify-between px-4 py-2 border-b border-white/10">
                     <div className="flex items-center gap-1.5 text-xs text-white/50">
                       <Languages className="w-3.5 h-3.5" />
-                      <span>Live Transcript</span>
+                      <span>{t.transcriptTitle}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <button
@@ -385,7 +396,7 @@ export function AgentPanel({
                                       : "text-white/50 hover:text-white",
                                   )}
                                 >
-                                  All
+                                  {t.allSpeakers}
                                 </button>
                                 {speakers.map((speaker) => (
                                   <button
@@ -415,12 +426,18 @@ export function AgentPanel({
                                         {liveTranscript.speaker}
                                       </span>
                                       <span className="text-[10px] text-blue-400/50">
-                                        speaking...
+                                        {t.speaking}
                                       </span>
                                     </div>
-                                    <p className="text-sm text-white">
-                                      {liveTranscript.text}
-                                    </p>
+                                    {liveTranscript.text ? (
+                                      <p className="text-sm text-white">
+                                        {liveTranscript.text}
+                                      </p>
+                                    ) : (
+                                      <p className="text-sm text-white/50 italic">
+                                        {t.translating}
+                                      </p>
+                                    )}
                                   </div>
                                 )}
 
@@ -445,17 +462,19 @@ export function AgentPanel({
                                           {entry.speaker}
                                         </span>
                                         <span className="text-xs text-white/30">
-                                          {formatTime(entry.timestamp)}
+                                          {formatTime(entry.timestamp, t)}
                                         </span>
                                       </div>
-                                      {entry.original !== entry.translated && (
-                                        <p className="text-xs text-white/40 line-through mb-0.5">
-                                          {entry.original}
+                                      {/* Only text in the reader's language */}
+                                      {entry.pending ? (
+                                        <p className="text-sm text-white/50 italic">
+                                          {t.translating}
+                                        </p>
+                                      ) : (
+                                        <p className="text-sm text-white">
+                                          {entry.translated}
                                         </p>
                                       )}
-                                      <p className="text-sm text-white">
-                                        {entry.translated}
-                                      </p>
                                     </div>
                                   ))}
 
@@ -465,10 +484,10 @@ export function AgentPanel({
                                     <div className="flex flex-col items-center justify-center py-8 text-center">
                                       <Languages className="w-8 h-8 text-white/20 mb-2" />
                                       <p className="text-sm text-white/50">
-                                        Waiting for speech...
+                                        {t.waitingForSpeech}
                                       </p>
                                       <p className="text-xs text-white/30 mt-1">
-                                        Translations appear here in real-time
+                                        {t.transcriptEmptyHint}
                                       </p>
                                     </div>
                                   )}
@@ -477,7 +496,7 @@ export function AgentPanel({
 
                           {/* Chat overlay - slides up from bottom when active */}
                           <AnimatePresence>
-                            {chatMessages.length > 0 && (
+                            {showAgent && chatMessages.length > 0 && (
                               <motion.div
                                 initial={{ height: 0, opacity: 0 }}
                                 animate={{ height: "auto", opacity: 1 }}
@@ -538,38 +557,40 @@ export function AgentPanel({
                     )}
                   </AnimatePresence>
 
-                  {/* Input field */}
-                  <form
-                    onSubmit={handleSubmit}
-                    className="px-4 py-3 border-t border-white/10"
-                  >
-                    <div className="flex items-center gap-2 bg-white/5 rounded-xl px-4 py-2.5">
-                      <input
-                        type="text"
-                        value={inputValue}
-                        onChange={(e) => setInputValue(e.target.value)}
-                        placeholder="Ask about the meeting..."
-                        disabled={isChatLoading}
-                        className="flex-1 bg-transparent text-sm text-white placeholder:text-white/40 focus:outline-none disabled:opacity-50"
-                      />
-                      <button
-                        type="submit"
-                        disabled={!inputValue.trim() || isChatLoading}
-                        className={cn(
-                          "p-1.5 rounded-lg transition-colors",
-                          inputValue.trim() && !isChatLoading
-                            ? "text-blue-400 hover:bg-blue-500/20"
-                            : "text-white/30",
-                        )}
-                      >
-                        {isChatLoading ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Send className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
-                  </form>
+                  {/* Input field (AI agent: team only) */}
+                  {showAgent && (
+                    <form
+                      onSubmit={handleSubmit}
+                      className="px-4 py-3 border-t border-white/10"
+                    >
+                      <div className="flex items-center gap-2 bg-white/5 rounded-xl px-4 py-2.5">
+                        <input
+                          type="text"
+                          value={inputValue}
+                          onChange={(e) => setInputValue(e.target.value)}
+                                                  placeholder={t.askAgent}
+                          disabled={isChatLoading}
+                          className="flex-1 bg-transparent text-sm text-white placeholder:text-white/40 focus:outline-none disabled:opacity-50"
+                        />
+                        <button
+                          type="submit"
+                          disabled={!inputValue.trim() || isChatLoading}
+                          className={cn(
+                            "p-1.5 rounded-lg transition-colors",
+                            inputValue.trim() && !isChatLoading
+                              ? "text-blue-400 hover:bg-blue-500/20"
+                              : "text-white/30",
+                          )}
+                        >
+                          {isChatLoading ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Send className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                    </form>
+                  )}
                 </div>
 
                 {/* Resize handles - only visible when expanded */}
@@ -628,9 +649,9 @@ export function AgentPanel({
   );
 }
 
-function formatTime(date: Date): string {
+function formatTime(date: Date, t: UiText): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 60) return t.secondsAgo(seconds);
   const minutes = Math.floor(seconds / 60);
-  return `${minutes}m ago`;
+  return t.minutesAgo(minutes);
 }

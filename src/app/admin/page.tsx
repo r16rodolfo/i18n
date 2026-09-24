@@ -80,6 +80,30 @@ export default async function AdminPage({
             </p>
           )}
 
+          {erro === "chave-soniox" && (
+            <p
+              role="alert"
+              className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+            >
+              A Soniox recusou a chave configurada na Vercel (SONIOX_API_KEY).
+              Ela não foi ativada: confira no painel da Soniox se a chave tem as
+              permissões &quot;Speech-to-text, real-time&quot; e &quot;Temporary
+              API keys&quot; e se a conta tem saldo.
+            </p>
+          )}
+
+          {erro === "chave-elevenlabs" && (
+            <p
+              role="alert"
+              className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+            >
+              A ElevenLabs recusou a chave configurada na Vercel
+              (ELEVENLABS_API_KEY). Ela não foi ativada: confira se a chave está
+              certa e se tem permissão de &quot;Speech to Text&quot; no painel
+              da ElevenLabs, e tente de novo.
+            </p>
+          )}
+
           <ul className="space-y-2">
             {TRANSLATION_PROVIDERS.map((provider) => {
               const info = TRANSLATION_PROVIDER_INFO[provider];

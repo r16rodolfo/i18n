@@ -2,7 +2,9 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { appSettings } from "@/db/schema";
+import { hasElevenLabsKey } from "@/lib/elevenlabs";
 import { hasPalabraKeys } from "@/lib/palabra";
+import { hasSonioxKey } from "@/lib/soniox";
 
 // Which service translates the call. Only the server decides this; the
 // browser receives the chosen provider when joining a room.
@@ -10,10 +12,20 @@ import { hasPalabraKeys } from "@/lib/palabra";
 // - "none":    plain video call, everyone hears the original audio
 // - "palabra": Palabra.ai speech-to-speech (others are heard only through
 //              the translated voice)
+// - "elevenlabs": each person's speech is transcribed by ElevenLabs and
+//              translated by OpenAI into captions; everyone keeps hearing
+//              the original voice
+// - "soniox":  same captions, but Soniox hears and translates in one go
+//              (faster)
 //
 // The choice is made in the admin panel (/admin) and stored in app_settings.
 // Until someone picks one there, the TRANSLATION_PROVIDER env var is used.
-export const TRANSLATION_PROVIDERS = ["none", "palabra"] as const;
+export const TRANSLATION_PROVIDERS = [
+  "none",
+  "palabra",
+  "elevenlabs",
+  "soniox",
+] as const;
 
 export type TranslationProvider = (typeof TRANSLATION_PROVIDERS)[number];
 
@@ -31,6 +43,16 @@ export const TRANSLATION_PROVIDER_INFO: Record<
     label: "Palabra.ai",
     description:
       "Tradução de voz em tempo real. Cada pessoa ouve os outros na voz traduzida.",
+  },
+  elevenlabs: {
+    label: "ElevenLabs + OpenAI",
+    description:
+      "Legendas e transcrição traduzidas na língua de cada pessoa. Todos ouvem a voz original.",
+  },
+  soniox: {
+    label: "Soniox",
+    description:
+      "Como a ElevenLabs + OpenAI, mas a Soniox ouve e traduz ao mesmo tempo: as traduções chegam alguns segundos antes. Todos ouvem a voz original.",
   },
 };
 
@@ -50,6 +72,11 @@ export function isConfigured(provider: TranslationProvider): boolean {
       return true;
     case "palabra":
       return hasPalabraKeys();
+    case "elevenlabs":
+      // ElevenLabs transcribes, OpenAI translates: both keys are needed
+      return hasElevenLabsKey() && Boolean(process.env.OPENAI_API_KEY?.trim());
+    case "soniox":
+      return hasSonioxKey();
   }
 }
 
@@ -69,9 +96,18 @@ export async function getSelectedTranslationProvider(): Promise<TranslationProvi
   return "none";
 }
 
+// Local development only: DEV_TRANSLATION_PROVIDER wins over the admin's
+// choice. The local app shares the production database, so testing a
+// provider through /admin would change it for real meetings too.
+function devOverride(): TranslationProvider | null {
+  if (process.env.NODE_ENV !== "development") return null;
+  const value = process.env.DEV_TRANSLATION_PROVIDER?.trim();
+  return isTranslationProvider(value) ? value : null;
+}
+
 // The provider calls actually use: falls back to "none" if keys are missing
 export async function getActiveTranslationProvider(): Promise<TranslationProvider> {
-  const selected = await getSelectedTranslationProvider();
+  const selected = devOverride() ?? (await getSelectedTranslationProvider());
 
   if (!isConfigured(selected)) {
     console.warn(

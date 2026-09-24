@@ -112,6 +112,55 @@ env var, and `none` if the chosen provider has no keys. Currently:
   `PALABRA_CLIENT_SECRET` pair (`src/lib/palabra.ts`). The admin panel checks
   the keys with a real session before enabling Palabra, and the call UI only
   mutes the original voice while Palabra's voice is actually playing.
+- `elevenlabs`: translated captions, original voice kept (phase 3, in
+  progress). Each browser transcribes **only its own mic** with ElevenLabs
+  Scribe Realtime (WebSocket straight to ElevenLabs), authenticated with a
+  single-use token from `POST /api/elevenlabs/token` (checks room access,
+  body `{ room, invite }`). OpenAI translates the text. Keys:
+  `ELEVENLABS_API_KEY` (restricted to Speech to Text) + `OPENAI_API_KEY`
+  (`src/lib/elevenlabs.ts`). The admin panel checks the key by creating a
+  token before enabling it.
+  - `use-scribe.ts`: mic → AudioWorklet → PCM at the context's own rate →
+    Scribe (`commit_strategy=vad`, 0.6 s pause ends a phrase). Audio is only
+    sent while the mic is open; `stop()` sends a final commit so the last
+    phrase comes out right away. One unused token is kept ready.
+  - `use-floor.ts`: floor control ("trava de fala"), on by default. "Falar"
+    takes the floor and closes everyone else's mic; "Terminei" or 8 s of
+    silence releases it. No server: state is synced with Daily app messages
+    (`kind: "r16-floor"`), sender taken from Daily's `fromId`, earliest
+    claim wins. Team members can turn it off for everyone (hand icon).
+  - `use-captions.ts` (`kind: "r16-caption"`): everyone announces the
+    language they want (`lang`). The speaker broadcasts partial/final text,
+    then `POST /api/rooms/[roomId]/captions` translates the phrase into the
+    listeners' languages (`src/lib/caption-translation.ts`, OpenAI
+    `OPENAI_TRANSLATION_MODEL`, default `gpt-5.4-mini`, reasoning off,
+    priority service tier unless `OPENAI_TRANSLATION_PRIORITY=false`, the
+    browser sends the last 6 pieces as context), saves it in `transcripts`
+    after answering (`after()`), and returns the translations, which the speaker broadcasts. `CaptionsBar` works like
+    TV subtitles: the last two finished pieces, each shown once translated
+    and never rewritten. Listeners only ever see text in their own
+    language (a "translating" hint meanwhile).
+  - Pieces: `caption-pieces.ts` cuts the live transcript **text** (never
+    the audio, so no word is cut in half): right after punctuation Scribe
+    added, once 2 more words followed; without punctuation, every ~14 words,
+    never ending on a linking word. What's left goes out when Scribe ends
+    the phrase (0.6 s pause) or on "Terminei".
+  - Planned next: translated voice (ElevenLabs TTS, per-speaker
+    female/male voice), glossary in `/admin`, agent reading `transcripts`.
+  - Local testing: the local app shares the production DB, so don't pick
+    ElevenLabs/Soniox in the local `/admin`; set `DEV_TRANSLATION_PROVIDER`
+    in `.env.local` instead (ignored outside `bun dev`).
+- `soniox`: same UI and flow as `elevenlabs` (floor control, captions,
+  transcript panel, `transcripts`), but `use-soniox.ts` sends each person's
+  own mic to Soniox (`stt-rt-v5`, WebSocket straight from the browser,
+  temporary single-use key from `POST /api/soniox/token`), which transcribes
+  AND translates (one_way into the language most listeners read, from
+  `useCaptions().getTargetLanguage()`). Soniox returns finished pieces with
+  their translation; they are broadcast in the `final` message and the
+  captions route only saves them (no OpenAI). Measured ~2–4 s sooner than
+  ElevenLabs + OpenAI. Key: `SONIOX_API_KEY` (`src/lib/soniox.ts`, needs
+  "Speech-to-text, real-time" + "Temporary API keys", prepaid balance).
+  Mic capture shared with ElevenLabs in `hooks/mic-tap.ts`.
 
 **Palabra is a permanent option; never remove it.** The owner wants to
 choose among several providers in the admin panel. To add a provider:
@@ -126,11 +175,10 @@ every new table.
 
 ### Known gaps (planned)
 - Agent routes still receive the transcript from the client instead of
-  reading it from the DB (fixed with phase 3, when transcripts are stored).
+  reading it from the DB. Transcripts are now stored (ElevenLabs provider);
+  switching the agent to read them is the last step of phase 3.
 - The in-call agent panel and e-mail dialog are still partly in English
   (team-only screens).
-- Phase 3: translated captions + original voice (streaming STT + LLM with a
-  glossary), transcripts persisted in `transcripts`.
 - `/[roomId]/agent` page is currently broken (calls `/actions` with GET and
   the chat without transcripts); fixed once transcripts live in the DB.
 
@@ -149,7 +197,8 @@ src/
 │   ├── api/
 │   │   ├── rooms/              # create room, join room (Daily token)
 │   │   ├── agent/[roomId]/     # AI agent: chat, intent, actions, execute
-│   │   └── palabra/[...path]/  # Palabra session proxy (keeps the secret server-side)
+│   │   ├── palabra/[...path]/  # Palabra session proxy (keeps the secret server-side)
+│   │   └── elevenlabs/token/   # single-use ElevenLabs token for the browser
 │   ├── [roomId]/               # access check + join form + call; agent/ (team only)
 │   ├── admin/                  # translation provider + team access (admins)
 │   ├── entrar/                 # login page + sign-in/sign-out server actions
