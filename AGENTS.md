@@ -121,7 +121,7 @@ env var, and `none` if the chosen provider has no keys. Currently:
   (`src/lib/elevenlabs.ts`). The admin panel checks the key by creating a
   token before enabling it.
   - `use-scribe.ts`: mic → AudioWorklet → PCM at the context's own rate →
-    Scribe (`commit_strategy=vad`, 0.8 s pause ends a phrase). Audio is only
+    Scribe (`commit_strategy=vad`, 0.6 s pause ends a phrase). Audio is only
     sent while the mic is open; `stop()` sends a final commit so the last
     phrase comes out right away. One unused token is kept ready.
   - `use-floor.ts`: floor control ("trava de fala"), on by default. "Falar"
@@ -135,11 +135,13 @@ env var, and `none` if the chosen provider has no keys. Currently:
     listeners' languages (`src/lib/caption-translation.ts`, OpenAI
     `OPENAI_TRANSLATION_MODEL`, default `gpt-5.4-mini`, reasoning off, 4
     earlier phrases as context), saves it in `transcripts`, and returns the
-    translations, which the speaker broadcasts. While the person is still
-    talking, the unfinished phrase is translated about once a second
-    (`partial: true`, not saved) and broadcast as `partial-translation`.
-    Listeners only ever see text in their own language (a "translating"
-    hint until the first translation arrives).
+    translations, which the speaker broadcasts. `CaptionsBar` works like
+    TV subtitles: the last two finished pieces, each shown once translated
+    and never rewritten. Listeners only ever see text in their own
+    language (a "translating" hint meanwhile).
+  - Pieces: `use-scribe.ts` cuts speech into 2.5–6 s pieces (manual commit
+    at the first 150 ms gap between words after 2.5 s, forced at 6 s), so
+    translations flow while the person keeps talking.
   - Planned next: translated voice (ElevenLabs TTS, per-speaker
     female/male voice), glossary in `/admin`, agent reading `transcripts`.
   - Local testing: the local app shares the production DB, so don't pick

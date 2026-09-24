@@ -8,12 +8,10 @@ import { isValidLanguageCode, type LanguageCode } from "@/lib/languages";
 import { getRoomAccess } from "@/lib/room-access";
 import { getActiveTranslationProvider } from "@/lib/translation-providers";
 
-// A phrase from the speaker's browser (ElevenLabs provider): translate it
-// into the languages the others want to hear and send the translations
-// back; the speaker then shares them with everyone through Daily.
-// Finished phrases are also saved in the meeting transcript. Unfinished ones
-// (partial: true, sent about every second while the person talks) are only
-// translated, so listeners can follow without waiting for the pause.
+// A piece of speech from the speaker's browser (ElevenLabs provider):
+// translate it into the languages the others want to hear, save it in the
+// meeting transcript and send the translations back. The speaker then
+// shares them with everyone through Daily.
 
 const languageCode = z.string().refine(isValidLanguageCode);
 
@@ -26,11 +24,10 @@ const CaptionSchema = z.object({
   targets: z.array(languageCode).max(5),
   speakerName: z.string().trim().min(1).max(60),
   visitorId: z.string().min(1).max(100),
-  partial: z.boolean().optional(),
 });
 
-// Earlier phrases given to the translator so short phrases make sense
-const CONTEXT_PHRASES = 4;
+// Earlier pieces given to the translator so short pieces make sense
+const CONTEXT_PHRASES = 6;
 
 export async function POST(
   req: Request,
@@ -76,7 +73,6 @@ export async function POST(
           from,
           to,
           context,
-          unfinished: caption.partial,
         });
         return text ? ([to, text] as const) : null;
       } catch (error) {
@@ -88,8 +84,6 @@ export async function POST(
   const translations: Record<string, string> = Object.fromEntries(
     results.filter((entry) => entry !== null),
   );
-
-  if (caption.partial) return Response.json({ translations });
 
   try {
     await db

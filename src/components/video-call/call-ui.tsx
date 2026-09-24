@@ -17,7 +17,7 @@ import { AgentPanel } from "@/components/agent-panel";
 import { CallControls } from "./call-controls";
 import { CaptionsBar } from "./captions-bar";
 import { EmailConfirmDialog } from "./email-confirm-dialog";
-import { useCaptions } from "./hooks/use-captions";
+import { liveTranscriptOf, useCaptions } from "./hooks/use-captions";
 import { useFloor } from "./hooks/use-floor";
 import { useIntentDetection } from "./hooks/use-intent-detection";
 import { useScribe } from "./hooks/use-scribe";
@@ -118,9 +118,7 @@ export function CallUI({
   const callTranscripts = useElevenLabs ? captions.entries : transcripts;
   // Only the phrase still being spoken: finished ones are already in the list
   const callLiveTranscript = useElevenLabs
-    ? captions.live && !captions.live.final
-      ? captions.live
-      : null
+    ? liveTranscriptOf(captions.live)
     : liveTranscript;
   const callTranscriptionStatus = useElevenLabs
     ? scribe.status === "error"

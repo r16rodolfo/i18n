@@ -74,30 +74,51 @@ export function CaptionsBar({
           <p className="text-xs font-medium uppercase tracking-wide text-white/50">
             {caption.speaker}
           </p>
-          {caption.translating ? (
-            // Only text in your own language is shown
-            <p className="flex items-center justify-center gap-2 text-lg leading-snug text-white/60 italic">
-              <span className="flex gap-1" aria-hidden>
-                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-white/60 [animation-delay:-0.3s]" />
-                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-white/60 [animation-delay:-0.15s]" />
-                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-white/60" />
-              </span>
-              {t.translating}
-            </p>
-          ) : (
-            <p
-              className={cn(
-                "text-lg leading-snug",
-                caption.final && !caption.interim
-                  ? "text-white"
-                  : "text-white/80 italic",
-              )}
-            >
-              {caption.text}
-            </p>
+          {/* Finished pieces (older one dimmer); only your language shows */}
+          {caption.lines.map((line, index) =>
+            line.translating ? (
+              <TranslatingHint key={line.id} label={t.translating} />
+            ) : (
+              <p
+                key={line.id}
+                className={cn(
+                  "text-lg leading-snug",
+                  index === caption.lines.length - 1
+                    ? "text-white"
+                    : "text-white/55",
+                )}
+              >
+                {line.text}
+              </p>
+            ),
           )}
+
+          {/* What is being said right now */}
+          {caption.talking &&
+            (caption.partialText ? (
+              <p className="text-lg leading-snug text-white/70 italic">
+                {caption.partialText}
+              </p>
+            ) : (
+              !caption.lines.some((line) => line.translating) && (
+                <TranslatingHint label={t.translating} />
+              )
+            ))}
         </div>
       )}
     </div>
+  );
+}
+
+function TranslatingHint({ label }: { label: string }) {
+  return (
+    <p className="flex items-center justify-center gap-2 text-base leading-snug text-white/60 italic">
+      <span className="flex gap-1" aria-hidden>
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-white/60 [animation-delay:-0.3s]" />
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-white/60 [animation-delay:-0.15s]" />
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-white/60" />
+      </span>
+      {label}
+    </p>
   );
 }

@@ -10,16 +10,25 @@ import type { LanguageCode } from "@/lib/languages";
 // /api/elevenlabs/token (the API key stays on the server). Audio is only
 // sent between start() and stop(), so nobody pays for a muted mic.
 //
-// Scribe cuts the speech into phrases by itself (VAD: a short pause ends a
-// phrase) and stop() forces the last phrase out right away, so pressing
-// "Terminei" doesn't wait for a pause.
+// Speech is cut into short pieces (about 3 to 6 seconds) so each one can be
+// translated and shown while the person keeps talking: after 2.5 s of
+// speech we cut at the next short gap between words, and at 6 s we cut
+// anyway. Scribe also ends a piece by itself after a longer silence, and
+// stop() pushes the last piece out right away ("Terminei").
 
 const SCRIBE_URL = "wss://api.elevenlabs.io/v1/speech-to-text/realtime";
 // Formats Scribe accepts; the mic is sent at the AudioContext's own rate
 const SUPPORTED_RATES = [8000, 16000, 22050, 24000, 44100, 48000];
 const CHUNK_MS = 100;
-// Microphone level (RMS) above which we count it as someone speaking
+// Microphone level (RMS) above which we count it as someone speaking...
 const VOICE_LEVEL = 0.02;
+// ...and below which it counts as a gap between words
+const QUIET_LEVEL = 0.012;
+// Piece length: cut at the first gap after the minimum, always at the max
+const PIECE_MIN_MS = 2500;
+const PIECE_MAX_MS = 6000;
+// A gap this long between words is a good place to cut
+const WORD_GAP_MS = 150;
 // Tokens are valid for 15 min; keep a fresh one ready to connect instantly
 const TOKEN_MAX_AGE_MS = 12 * 60 * 1000;
 // After stop(): how long to wait for the last phrase before closing
@@ -93,6 +102,9 @@ export function useScribe({
   const batchRef = useRef<Float32Array[]>([]);
   const batchLengthRef = useRef(0);
   const lastVoiceAtRef = useRef(0);
+  // When the current piece started (first speech) and the current gap began
+  const pieceStartRef = useRef<number | null>(null);
+  const quietSinceRef = useRef<number | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchToken = useCallback(async (): Promise<string | null> => {
@@ -198,12 +210,31 @@ export function useScribe({
 
       let sum = 0;
       for (let i = 0; i < samples.length; i++) sum += samples[i] * samples[i];
-      if (Math.sqrt(sum / samples.length) > VOICE_LEVEL) {
-        lastVoiceAtRef.current = Date.now();
+      const level = Math.sqrt(sum / samples.length);
+      const now = Date.now();
+      if (level > VOICE_LEVEL) {
+        lastVoiceAtRef.current = now;
+        quietSinceRef.current = null;
+        pieceStartRef.current ??= now;
+      } else if (level < QUIET_LEVEL) {
+        quietSinceRef.current ??= now;
       }
 
       batchRef.current.push(samples);
       batchLengthRef.current += samples.length;
+
+      // End the piece here so it can be translated while you keep talking
+      const pieceStart = pieceStartRef.current;
+      const quietSince = quietSinceRef.current;
+      if (pieceStart !== null) {
+        const age = now - pieceStart;
+        const atGap = quietSince !== null && now - quietSince >= WORD_GAP_MS;
+        if ((age >= PIECE_MIN_MS && atGap) || age >= PIECE_MAX_MS) {
+          pieceStartRef.current = null;
+          flushBatch(true);
+          return;
+        }
+      }
       if (batchLengthRef.current >= samplesPerChunk) flushBatch(false);
     };
 
@@ -300,6 +331,8 @@ export function useScribe({
     if (!enabled || sendingRef.current) return;
     sendingRef.current = true;
     lastVoiceAtRef.current = Date.now();
+    pieceStartRef.current = null;
+    quietSinceRef.current = null;
     pendingRef.current = [];
 
     if (closeTimerRef.current) {
@@ -327,6 +360,7 @@ export function useScribe({
   const stop = useCallback(() => {
     if (!sendingRef.current) return;
     sendingRef.current = false;
+    pieceStartRef.current = null;
     flushBatch(true);
 
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
