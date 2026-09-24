@@ -11,8 +11,11 @@ interface ParticipantTileProps {
   username?: string;
   isLocal?: boolean;
   preferredLanguage?: LanguageCode;
-  /** Play this participant's original voice (off when Palabra plays a translated voice instead) */
-  playAudio?: boolean;
+  /**
+   * Volume of this participant's original voice, 0 to 1. Lowered (not cut)
+   * while a translated voice plays, like a live interpreter.
+   */
+  originalVolume?: number;
 }
 
 export function ParticipantTile({
@@ -20,7 +23,7 @@ export function ParticipantTile({
   username,
   isLocal,
   preferredLanguage,
-  playAudio = false,
+  originalVolume = 1,
 }: ParticipantTileProps) {
   const videoTrack = useVideoTrack(sessionId);
   const audioTrack = useAudioTrack(sessionId);
@@ -41,6 +44,10 @@ export function ParticipantTile({
     audio.srcObject = new MediaStream([track]);
   }, [audioTrack?.persistentTrack]);
 
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = originalVolume;
+  }, [originalVolume]);
+
   return (
     <div className="relative bg-neutral-800 rounded-xl overflow-hidden">
       <video
@@ -51,7 +58,10 @@ export function ParticipantTile({
         className="w-full h-full object-cover"
       />
 
-      {!isLocal && playAudio && (
+      {/* Always mounted for remote participants: Chrome only feeds a remote
+          WebRTC track into Web Audio (the translator's input) while a media
+          element is playing it. Loudness is controlled with originalVolume. */}
+      {!isLocal && (
         // biome-ignore lint/a11y/useMediaCaption: live call audio, captions are shown separately
         <audio ref={audioRef} autoPlay playsInline />
       )}
