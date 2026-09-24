@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { appSettings } from "@/db/schema";
+import { hasElevenLabsKey } from "@/lib/elevenlabs";
 import { hasPalabraKeys } from "@/lib/palabra";
 
 // Which service translates the call. Only the server decides this; the
@@ -10,10 +11,13 @@ import { hasPalabraKeys } from "@/lib/palabra";
 // - "none":    plain video call, everyone hears the original audio
 // - "palabra": Palabra.ai speech-to-speech (others are heard only through
 //              the translated voice)
+// - "elevenlabs": each person's speech is transcribed by ElevenLabs and
+//              translated by OpenAI into captions; everyone keeps hearing
+//              the original voice
 //
 // The choice is made in the admin panel (/admin) and stored in app_settings.
 // Until someone picks one there, the TRANSLATION_PROVIDER env var is used.
-export const TRANSLATION_PROVIDERS = ["none", "palabra"] as const;
+export const TRANSLATION_PROVIDERS = ["none", "palabra", "elevenlabs"] as const;
 
 export type TranslationProvider = (typeof TRANSLATION_PROVIDERS)[number];
 
@@ -31,6 +35,11 @@ export const TRANSLATION_PROVIDER_INFO: Record<
     label: "Palabra.ai",
     description:
       "Tradução de voz em tempo real. Cada pessoa ouve os outros na voz traduzida.",
+  },
+  elevenlabs: {
+    label: "ElevenLabs + OpenAI",
+    description:
+      "Legendas traduzidas na língua de cada pessoa. Todos ouvem a voz original. (Em construção: as legendas chegam nas próximas etapas.)",
   },
 };
 
@@ -50,6 +59,9 @@ export function isConfigured(provider: TranslationProvider): boolean {
       return true;
     case "palabra":
       return hasPalabraKeys();
+    case "elevenlabs":
+      // ElevenLabs transcribes, OpenAI translates: both keys are needed
+      return hasElevenLabsKey() && Boolean(process.env.OPENAI_API_KEY?.trim());
   }
 }
 

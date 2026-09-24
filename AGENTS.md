@@ -112,6 +112,17 @@ env var, and `none` if the chosen provider has no keys. Currently:
   `PALABRA_CLIENT_SECRET` pair (`src/lib/palabra.ts`). The admin panel checks
   the keys with a real session before enabling Palabra, and the call UI only
   mutes the original voice while Palabra's voice is actually playing.
+- `elevenlabs`: translated captions, original voice kept (phase 3, in
+  progress). Each browser transcribes **only its own mic** with ElevenLabs
+  Scribe Realtime (WebSocket straight to ElevenLabs), authenticated with a
+  single-use token from `POST /api/elevenlabs/token` (checks room access,
+  body `{ room, invite }`). OpenAI translates the text. Keys:
+  `ELEVENLABS_API_KEY` (restricted to Speech to Text) + `OPENAI_API_KEY`
+  (`src/lib/elevenlabs.ts`). The admin panel checks the key by creating a
+  token before enabling it. Planned next: floor control ("Falar"/"Terminei",
+  others auto-muted, release = manual commit), captions + transcripts saved
+  in `transcripts`, translated voice (ElevenLabs TTS, per-speaker
+  female/male voice), glossary in `/admin`.
 
 **Palabra is a permanent option; never remove it.** The owner wants to
 choose among several providers in the admin panel. To add a provider:
@@ -149,7 +160,8 @@ src/
 │   ├── api/
 │   │   ├── rooms/              # create room, join room (Daily token)
 │   │   ├── agent/[roomId]/     # AI agent: chat, intent, actions, execute
-│   │   └── palabra/[...path]/  # Palabra session proxy (keeps the secret server-side)
+│   │   ├── palabra/[...path]/  # Palabra session proxy (keeps the secret server-side)
+│   │   └── elevenlabs/token/   # single-use ElevenLabs token for the browser
 │   ├── [roomId]/               # access check + join form + call; agent/ (team only)
 │   ├── admin/                  # translation provider + team access (admins)
 │   ├── entrar/                 # login page + sign-in/sign-out server actions
