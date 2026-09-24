@@ -360,12 +360,18 @@ export function useCaptions({
               original: text,
               translated: text,
               timestamp: new Date(),
+              pending: needsTranslation,
             });
             if (needsTranslation) {
               // Translation lost or too slow: the original beats nothing
               setTimeout(() => {
                 const line = liveRef.current?.lines.find((l) => l.id === id);
                 if (line?.translating) updateLine(id, { translating: false });
+                setEntries((prev) =>
+                  prev.map((entry) =>
+                    entry.id === id ? { ...entry, pending: false } : entry,
+                  ),
+                );
               }, TRANSLATION_TIMEOUT_MS);
             }
             break;
@@ -379,7 +385,9 @@ export function useCaptions({
             if (!id || !text) return;
             setEntries((prev) =>
               prev.map((entry) =>
-                entry.id === id ? { ...entry, translated: text } : entry,
+                entry.id === id
+                  ? { ...entry, translated: text, pending: false }
+                  : entry,
               ),
             );
             updateLine(id, { text, translating: false });
@@ -414,11 +422,12 @@ export function useCaptions({
   return { live, entries, publishPartial, publishFinal };
 }
 
-// What the agent panel shows as "speaking now"
+// What the transcript panel shows as "speaking now" (empty text when they
+// speak another language: the panel shows "translating" instead)
 export function liveTranscriptOf(
   caption: LiveCaption | null,
 ): LiveTranscript | null {
-  return caption?.talking && caption.partialText
-    ? { speaker: caption.speaker, text: caption.partialText }
+  return caption?.talking
+    ? { speaker: caption.speaker, text: caption.partialText ?? "" }
     : null;
 }

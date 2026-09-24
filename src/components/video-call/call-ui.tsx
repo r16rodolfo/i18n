@@ -52,6 +52,27 @@ export function CallUI({
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  // Captions under the video: each person turns them on/off (remembered)
+  const [showCaptions, setShowCaptions] = useState(true);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("showCaptions") === "false") {
+        setShowCaptions(false);
+      }
+    } catch {
+      // Storage blocked: keep them on
+    }
+  }, []);
+  const toggleCaptions = useCallback(() => {
+    setShowCaptions((current) => {
+      try {
+        localStorage.setItem("showCaptions", String(!current));
+      } catch {
+        // Storage blocked: only for this call
+      }
+      return !current;
+    });
+  }, []);
 
   // With Palabra, others are heard only through the translated voice.
   // Otherwise the original audio of each participant is played.
@@ -110,6 +131,9 @@ export function CallUI({
     onCommitted: captions.publishFinal,
   });
   const floorActive = useElevenLabs && floor.floorMode;
+  // The transcript panel: everyone in ElevenLabs meetings (in their own
+  // language); the AI agent inside it stays team-only
+  const showTranscriptPanel = isTeamMember || useElevenLabs;
   // Is your mic open? With the floor control on, only while you have the
   // floor; otherwise it follows the mute button.
   const micOpen = floorActive ? floor.iHold : !isMuted;
@@ -312,7 +336,7 @@ export function CallUI({
 
         {useElevenLabs && (
           <CaptionsBar
-            caption={captions.live}
+            caption={showCaptions ? captions.live : null}
             floorStatus={
               floorActive
                 ? {
@@ -324,20 +348,22 @@ export function CallUI({
                 : null
             }
             hasError={scribe.status === "error"}
-            raised={isTeamMember}
+            raised={showTranscriptPanel}
             uiLang={uiLang}
           />
         )}
       </div>
 
-      {/* Floating agent panel (team only) */}
-      {isTeamMember && (
+      {/* Floating transcript panel (+ AI agent for the team) */}
+      {showTranscriptPanel && (
         <AgentPanel
           preferredLanguage={preferredLanguage}
           transcripts={callTranscripts}
           liveTranscript={callLiveTranscript}
           transcriptionStatus={callTranscriptionStatus}
           roomId={roomId}
+          showAgent={isTeamMember}
+          uiLang={uiLang}
         />
       )}
 
@@ -360,6 +386,11 @@ export function CallUI({
                 onTake: floor.take,
                 onRelease: floor.release,
               }
+            : undefined
+        }
+        captionsToggle={
+          useElevenLabs
+            ? { enabled: showCaptions, onToggle: toggleCaptions }
             : undefined
         }
         floorToggle={

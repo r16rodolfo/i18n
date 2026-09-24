@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  Captions,
+  CaptionsOff,
   Hand,
   Info,
   Mic,
@@ -25,6 +27,12 @@ export interface FloorControls {
   onRelease: () => void;
 }
 
+// Show/hide the captions under the video (each person decides for themselves)
+export interface CaptionsToggle {
+  enabled: boolean;
+  onToggle: () => void;
+}
+
 // Team only: turn the floor control on/off for everyone
 export interface FloorToggle {
   enabled: boolean;
@@ -42,6 +50,7 @@ interface CallControlsProps {
   onShowShare?: () => void;
   floor?: FloorControls;
   floorToggle?: FloorToggle;
+  captionsToggle?: CaptionsToggle;
   uiLang: UiLang;
 }
 
@@ -55,6 +64,7 @@ export function CallControls({
   onShowShare,
   floor,
   floorToggle,
+  captionsToggle,
   uiLang,
 }: CallControlsProps) {
   const t = uiText(uiLang);
@@ -119,6 +129,29 @@ export function CallControls({
 
       {/* Team buttons - absolute positioned on the right */}
       <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1">
+        {captionsToggle && (
+          <button
+            type="button"
+            onClick={captionsToggle.onToggle}
+            className={cn(
+              "p-2 rounded-lg transition-colors cursor-pointer hover:bg-white/10",
+              captionsToggle.enabled
+                ? "text-white hover:text-white"
+                : "text-white/50 hover:text-white",
+            )}
+            title={captionsToggle.enabled ? t.captionsHide : t.captionsShow}
+            aria-label={
+              captionsToggle.enabled ? t.captionsHide : t.captionsShow
+            }
+            aria-pressed={captionsToggle.enabled}
+          >
+            {captionsToggle.enabled ? (
+              <Captions className="w-5 h-5" />
+            ) : (
+              <CaptionsOff className="w-5 h-5" />
+            )}
+          </button>
+        )}
         {floorToggle && (
           <button
             type="button"
