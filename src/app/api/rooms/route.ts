@@ -1,22 +1,22 @@
 import { db } from "@/db";
 import { rooms } from "@/db/schema";
-import { generateRoomId } from "@/lib/nanoid";
+import { getTeamMember, unauthorized } from "@/lib/auth";
+import { generateInviteToken, generateRoomId } from "@/lib/nanoid";
 
-export async function POST(req: Request) {
+const ROOM_DURATION_SECONDS = 3600 * 2; // 2 hours
+
+// Only team members create rooms. Guests get in with the invite link.
+export async function POST() {
+  const member = await getTeamMember();
+  if (!member) return unauthorized();
+
   try {
-    const body = await req.json().catch(() => ({}));
-    const { visitorId } = body as { visitorId?: string };
-
-    if (!visitorId) {
-      return Response.json(
-        { error: "visitorId is required" },
-        { status: 400 }
-      );
-    }
-
     const dailyRoomName = generateRoomId();
+    const expiresAtSeconds =
+      Math.floor(Date.now() / 1000) + ROOM_DURATION_SECONDS;
 
-    // Create Daily.co room
+    // Create Daily.co room. "private" means nobody gets in without a meeting
+    // token, and only /api/rooms/[roomId]/join hands those out.
     const dailyRes = await fetch("https://api.daily.co/v1/rooms", {
       method: "POST",
       headers: {
@@ -25,10 +25,13 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         name: dailyRoomName,
+        privacy: "private",
         properties: {
           max_participants: 10,
-          exp: Math.floor(Date.now() / 1000) + 3600 * 2, // 2 hours
+          exp: expiresAtSeconds,
+          eject_at_room_exp: true,
           enable_chat: true,
+          enable_knocking: false,
           start_video_off: false,
           start_audio_off: false,
           // Transcription permissions
@@ -43,31 +46,34 @@ export async function POST(req: Request) {
       const error = await dailyRes.text();
       console.error("Daily.co error:", error);
       return Response.json(
-        { error: "Failed to create video room" },
-        { status: 500 }
+        { error: "Não foi possível criar a sala de vídeo" },
+        { status: 500 },
       );
     }
 
     const dailyData = await dailyRes.json();
+    const inviteToken = generateInviteToken();
 
-    // Insert into database (id is auto-generated uuid)
     const [room] = await db
       .insert(rooms)
       .values({
         dailyRoomName: dailyData.name,
         dailyRoomUrl: dailyData.url,
-        createdByFingerprint: visitorId,
-        expiresAt: new Date(Date.now() + 3600 * 2 * 1000), // 2 hours
+        createdBy: member.userId,
+        inviteToken,
+        expiresAt: new Date(expiresAtSeconds * 1000),
       })
       .returning();
 
     return Response.json({
       roomId: room.dailyRoomName,
-      dailyRoomName: room.dailyRoomName,
-      url: dailyData.url,
+      invitePath: `/${room.dailyRoomName}?convite=${inviteToken}`,
     });
   } catch (error) {
     console.error("Error creating room:", error);
-    return Response.json({ error: "Failed to create room" }, { status: 500 });
+    return Response.json(
+      { error: "Não foi possível criar a sala" },
+      { status: 500 },
+    );
   }
 }

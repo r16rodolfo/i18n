@@ -1,11 +1,9 @@
 import { generateObject } from "ai";
 import { z } from "zod";
 
-import {
-  ActionsRequestSchema,
-  EmailActionSchema,
-} from "@/lib/agent-schemas";
+import { ActionsRequestSchema, EmailActionSchema } from "@/lib/agent-schemas";
 import { chatModel } from "@/lib/ai";
+import { getTeamMember, unauthorized } from "@/lib/auth";
 
 const IntentDetectionSchema = z.object({
   hasEmailIntent: z.boolean(),
@@ -18,6 +16,9 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ roomId: string }> },
 ) {
+  // Team only: these routes spend OpenAI credits and can send e-mail
+  if (!(await getTeamMember())) return unauthorized();
+
   try {
     await params;
     const body = await req.json();
@@ -74,9 +75,6 @@ If hasEmailIntent is true, generate a complete email action with:
     return Response.json(result.object);
   } catch (error) {
     console.error("Intent detection error:", error);
-    return Response.json(
-      { error: "Failed to detect intent" },
-      { status: 500 },
-    );
+    return Response.json({ error: "Failed to detect intent" }, { status: 500 });
   }
 }

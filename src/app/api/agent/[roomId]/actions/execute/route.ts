@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { sendEmail } from "@/tools/send-email";
+import { getTeamMember, unauthorized } from "@/lib/auth";
 
 const RecipientsSchema = z.array(z.email()).min(1).max(20);
 
@@ -24,8 +25,11 @@ interface ExecuteRequest {
 
 export async function POST(
   req: Request,
-  { params }: { params: Promise<{ roomId: string }> }
+  { params }: { params: Promise<{ roomId: string }> },
 ) {
+  // Team only: these routes spend OpenAI credits and can send e-mail
+  if (!(await getTeamMember())) return unauthorized();
+
   try {
     const { roomId } = await params;
     const { action, meetingSummary }: ExecuteRequest = await req.json();
@@ -37,12 +41,12 @@ export async function POST(
     switch (action.type) {
       case "email": {
         const parsedRecipients = RecipientsSchema.safeParse(
-          action.metadata.recipients ?? []
+          action.metadata.recipients ?? [],
         );
         if (!parsedRecipients.success) {
           return Response.json(
             { error: "Informe pelo menos um e-mail válido" },
-            { status: 400 }
+            { status: 400 },
           );
         }
         const recipients = parsedRecipients.data;
@@ -57,7 +61,7 @@ export async function POST(
         if (!result.success) {
           return Response.json(
             { error: result.error || "Failed to send email" },
-            { status: 500 }
+            { status: 500 },
           );
         }
 
@@ -93,16 +97,13 @@ export async function POST(
       }
 
       default:
-        return Response.json(
-          { error: "Unknown action type" },
-          { status: 400 }
-        );
+        return Response.json({ error: "Unknown action type" }, { status: 400 });
     }
   } catch (error) {
     console.error("Action execution error:", error);
     return Response.json(
       { error: "Failed to execute action" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

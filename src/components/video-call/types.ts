@@ -10,6 +10,11 @@ export interface VideoCallProps {
   visitorId: string;
   roomId: string;
   translationProvider: TranslationProvider;
+  // Guests: the invite token from their link. Team members: null.
+  inviteToken: string | null;
+  isTeamMember: boolean;
+  // Guest link to share (team members only)
+  invitePath: string | null;
 }
 
 export interface TranscriptEntry {

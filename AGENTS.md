@@ -22,7 +22,9 @@ say how to test them.
 - **Styling**: Tailwind CSS v4 with shadcn/ui (new-york style)
 - **Database**: Drizzle ORM + **Supabase Postgres** via `postgres` (postgres-js)
   through the transaction pooler (port 6543, `prepare: false`)
-- **Auth**: Supabase Auth (planned, phase 2)
+- **Auth**: Supabase Auth, e-mail + password (`@supabase/ssr`). Accounts are
+  created in the Supabase dashboard; access is granted in `/admin`
+  (`team_members` table). Public sign-ups must stay disabled in Supabase
 - **AI**: AI SDK v6 + `@ai-sdk/openai` called directly with `OPENAI_API_KEY`
   (no AI Gateway). Model from `OPENAI_MODEL`, see `src/lib/ai.ts`
 - **Video**: Daily.co (`@daily-co/daily-js` + `@daily-co/daily-react`)
@@ -61,33 +63,55 @@ All documented in `.env.example` (copy to `.env.local`). Key rules:
   needs an external service, the server issues a short-lived token/session.
 - `DATABASE_URL` = Supabase transaction pooler (6543). `DATABASE_MIGRATION_URL`
   (optional) = session pooler (5432), used only by drizzle-kit.
+- `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` are public
+  on purpose (Auth only). Never use the Supabase secret/service_role key here.
 
 ## Architecture
 
-### Flow today
-1. `POST /api/rooms` creates a Daily room + a `rooms` row, returns a nanoid slug.
-2. `/[roomId]` join form → `POST /api/rooms/[roomId]/join` upserts a
-   `participants` row, returns a Daily meeting token and the active
-   `translationProvider`.
+### Who can do what
+- **Team member** = Supabase login + row in `team_members` (`admin`|`member`).
+  `getTeamMember()` / `requireTeamMember()` / `requireAdmin()` in
+  `src/lib/auth.ts`. `src/proxy.ts` only refreshes the session cookie; every
+  page, route handler and server action checks access itself.
+- **Guest** (client) = holder of a room's invite link
+  `/{room}?convite={rooms.invite_token}`, valid until the room expires (2 h).
+  `getRoomAccess()` in `src/lib/room-access.ts` is the single check for
+  "may this request use this room".
+- Guest screens are in Spanish, team screens in Portuguese
+  (`src/lib/ui-text.ts` for screens both can see).
+
+### Flow
+1. Team member clicks "Nova reunião" on `/` → `POST /api/rooms` (team only)
+   creates a **private** Daily room (no entry without a meeting token) and a
+   `rooms` row with a random `invite_token`.
+2. `/[roomId]` (server page) checks access, then the join form →
+   `POST /api/rooms/[roomId]/join` (team or valid invite) upserts a
+   `participants` row and returns a Daily meeting token (expires with the
+   room), the active `translationProvider`, and for the team the invite link.
 3. `CallUI` joins Daily. Remote audio is played by `ParticipantTile`
    unless the provider replaces it (Palabra).
-4. Agent: `/api/agent/[roomId]` (chat), `/intent` (email intent detection),
-   `/actions` (action items), `/actions/execute` (send email via Resend;
-   recipients must be confirmed by the user, never hardcoded).
+4. Agent (team only, UI hidden from guests): `/api/agent/[roomId]` (chat),
+   `/intent` (email intent detection), `/actions` (action items),
+   `/actions/execute` (send email via Resend; recipients must be confirmed by
+   the user, never hardcoded).
+5. `/admin` (admins): pick the translation provider, grant/revoke team access.
 
 ### Translation providers
 `src/lib/translation-providers.ts` decides on the server which provider is
-active (`getActiveTranslationProvider()`, async so it can later read the
-admin panel settings from the DB). Currently:
+active (`getActiveTranslationProvider()`): the admin's choice in
+`app_settings` (key `translation_provider`), else the `TRANSLATION_PROVIDER`
+env var, and `none` if the chosen provider has no keys. Currently:
 
 - `none`: plain call, original audio
 - `palabra`: Palabra.ai speech-to-speech (`use-transcription.ts`); remote
-  original audio is not played, only Palabra's TTS
+  original audio is not played, only Palabra's TTS. The browser SDK uses
+  `apiBaseUrl: "/api/palabra"`: that route proxies session create/delete with
+  the Palabra keys, after checking room access (bearer = `{room}.{invite}`).
+  The Palabra secret never reaches the browser.
 
 **Palabra is a permanent option; never remove it.** The owner wants to
-choose among several providers (enable/disable them in the admin panel,
-phase 2). Selected by `TRANSLATION_PROVIDER` for now; falls back to `none`
-when keys are missing. To add a provider: extend `TRANSLATION_PROVIDERS`, add its
+choose among several providers in the admin panel. To add a provider:
+extend `TRANSLATION_PROVIDERS` and `TRANSLATION_PROVIDER_INFO`, add its
 `isConfigured` check, and branch in `CallUI`.
 
 ### Database security
@@ -97,10 +121,10 @@ Data API (anon key) cannot read or write app tables. Keep `.enableRLS()` on
 every new table.
 
 ### Known gaps (planned)
-- Phase 2: Supabase Auth, invite links for guests, private Daily rooms,
-  replace `/api/palabra-auth` (still returns the Palabra secret when Palabra
-  is active) with a server-side session proxy (Palabra itself stays), admin panel for providers,
-  agent routes reading transcripts from the DB instead of the client.
+- Agent routes still receive the transcript from the client instead of
+  reading it from the DB (fixed with phase 3, when transcripts are stored).
+- The in-call agent panel and e-mail dialog are still partly in English
+  (team-only screens).
 - Phase 3: translated captions + original voice (streaming STT + LLM with a
   glossary), transcripts persisted in `transcripts`.
 - `/[roomId]/agent` page is currently broken (calls `/actions` with GET and
@@ -121,10 +145,13 @@ src/
 │   ├── api/
 │   │   ├── rooms/              # create room, join room (Daily token)
 │   │   ├── agent/[roomId]/     # AI agent: chat, intent, actions, execute
-│   │   └── palabra-auth/       # insecure, becomes a server-side proxy in phase 2
-│   ├── [roomId]/               # join form + call; agent/ (post-meeting page)
+│   │   └── palabra/[...path]/  # Palabra session proxy (keeps the secret server-side)
+│   ├── [roomId]/               # access check + join form + call; agent/ (team only)
+│   ├── admin/                  # translation provider + team access (admins)
+│   ├── entrar/                 # login page + sign-in/sign-out server actions
+│   ├── saiu/                   # where guests land after leaving a call
 │   ├── layout.tsx
-│   ├── page.tsx                # landing / create room
+│   ├── page.tsx                # team dashboard: new meeting, open rooms
 │   └── globals.css
 ├── components/
 │   ├── ui/                     # shadcn/ui (DO NOT EDIT directly)
@@ -134,8 +161,10 @@ src/
 ├── db/
 │   ├── index.ts                # postgres-js + Drizzle client (lazy)
 │   └── schema.ts               # tables (all with RLS enabled)
-├── hooks/                      # use-fingerprint (replaced by auth in phase 2)
-├── lib/                        # ai.ts, languages.ts, translation-providers.ts, ...
+├── hooks/                      # use-fingerprint (anonymous participant id)
+├── lib/                        # auth.ts, room-access.ts, supabase/, ui-text.ts,
+│                               # translation-providers.ts, languages.ts, ai.ts
+├── proxy.ts                    # refreshes the Supabase session cookie
 └── tools/                      # send-email (Resend), web-search (Exa)
 drizzle/                        # generated SQL migrations
 ```

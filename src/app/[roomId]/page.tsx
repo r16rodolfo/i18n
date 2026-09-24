@@ -1,194 +1,50 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { getTeamMember } from "@/lib/auth";
+import { getRoomAccess } from "@/lib/room-access";
 
-import { ArrowRight, Loader2 } from "lucide-react";
+import { RoomClient } from "./room-client";
 
-import { getLanguageName, type LanguageCode } from "@/lib/languages";
-import type { TranslationProvider } from "@/lib/translation-providers";
+export default async function RoomPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ roomId: string }>;
+  searchParams: Promise<{ convite?: string | string[] }>;
+}) {
+  const { roomId } = await params;
+  const { convite } = await searchParams;
+  const inviteToken = typeof convite === "string" ? convite : null;
 
-import { LanguageSelector } from "@/components/language-selector";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { VideoCall } from "@/components/video-call";
+  const access = await getRoomAccess(roomId, inviteToken);
 
-import { useFingerprint } from "@/hooks/use-fingerprint";
+  if (!access) {
+    // A team member who opened a plain room link just needs to log in
+    if (!inviteToken && !(await getTeamMember())) redirect("/entrar");
 
-export default function RoomPage() {
-  const params = useParams();
-  const roomId = params.roomId as string;
-  const { visitorId, isLoading: isLoadingFingerprint } = useFingerprint();
-
-  const [username, setUsername] = useState("");
-  const [spokenLanguage, setSpokenLanguage] = useState<LanguageCode>("en");
-  const [preferredLanguage, setPreferredLanguage] =
-    useState<LanguageCode>("en");
-  const [isJoining, setIsJoining] = useState(false);
-  const [isJoined, setIsJoined] = useState(false);
-  const [roomUrl, setRoomUrl] = useState<string | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [translationProvider, setTranslationProvider] =
-    useState<TranslationProvider>("none");
-  const [error, setError] = useState<string | null>(null);
-
-  // Load language preferences from localStorage on mount
-  useEffect(() => {
-    const storedSpoken = localStorage.getItem("spokenLanguage");
-    const storedPreferred = localStorage.getItem("preferredLanguage");
-    if (storedSpoken) setSpokenLanguage(storedSpoken as LanguageCode);
-    if (storedPreferred) setPreferredLanguage(storedPreferred as LanguageCode);
-  }, []);
-
-  const handleSpokenLanguageChange = (lang: LanguageCode) => {
-    setSpokenLanguage(lang);
-    localStorage.setItem("spokenLanguage", lang);
-  };
-
-  const handlePreferredLanguageChange = (lang: LanguageCode) => {
-    setPreferredLanguage(lang);
-    localStorage.setItem("preferredLanguage", lang);
-  };
-
-  const handleJoin = async () => {
-    if (!visitorId || !username.trim()) return;
-
-    setIsJoining(true);
-    setError(null);
-
-    try {
-      const res = await fetch(`/api/rooms/${roomId}/join`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          visitorId,
-          username: username.trim(),
-          preferredLanguage,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to join room");
-      }
-
-      setRoomUrl(data.roomUrl);
-      setToken(data.token);
-      setTranslationProvider(data.translationProvider ?? "none");
-      setIsJoined(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to join room");
-    } finally {
-      setIsJoining(false);
-    }
-  };
-
-  // Show video call when joined
-  if (isJoined && roomUrl && token && visitorId) {
     return (
-      <VideoCall
-        roomUrl={roomUrl}
-        token={token}
-        spokenLanguage={spokenLanguage}
-        preferredLanguage={preferredLanguage}
-        username={username}
-        visitorId={visitorId}
-        roomId={roomId}
-        translationProvider={translationProvider}
-      />
-    );
-  }
-
-  // Show join form
-  return (
-    <div className="min-h-screen bg-neutral-100 flex items-center justify-center">
-      <div className="w-full max-w-md p-8">
-        <div className="space-y-6">
-          <div className="space-y-2 text-center">
-            <p className="text-xs font-medium tracking-widest uppercase text-neutral-500">
-              [ JOIN ROOM ]
-            </p>
-            <h1 className="text-3xl font-light tracking-tight text-black">
-              Room {roomId.slice(0, 6)}...
-            </h1>
-            <p className="text-neutral-600">
-              Set your name and languages
-            </p>
-          </div>
-
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleJoin();
-            }}
-            className="space-y-4"
-          >
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-black">
-                Your Name
-              </label>
-              <Input
-                type="text"
-                placeholder="Enter your name"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="bg-white"
-                disabled={isJoining || isLoadingFingerprint}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-black">
-                I will speak in
-              </label>
-              <LanguageSelector
-                value={spokenLanguage}
-                onChange={handleSpokenLanguageChange}
-                disabled={isJoining}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-black">
-                I want to hear in
-              </label>
-              <LanguageSelector
-                value={preferredLanguage}
-                onChange={handlePreferredLanguageChange}
-                disabled={isJoining}
-              />
-            </div>
-
-            {error && (
-              <p className="text-sm text-red-600 text-center">{error}</p>
-            )}
-
-            <Button
-              type="submit"
-              disabled={!username.trim() || isJoining || isLoadingFingerprint}
-              className="w-full bg-black text-white hover:bg-neutral-800 cursor-pointer"
-            >
-              {isJoining || isLoadingFingerprint ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  {isLoadingFingerprint ? "Loading..." : "Joining..."}
-                </>
-              ) : (
-                <>
-                  Join Call
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </>
-              )}
-            </Button>
-          </form>
-
-          <p className="text-xs text-center text-neutral-500">
-            You'll speak in {getLanguageName(spokenLanguage)} and hear others
-            in {getLanguageName(preferredLanguage)}
+      <div className="min-h-screen bg-neutral-100 flex items-center justify-center p-8">
+        <div className="max-w-md text-center space-y-3">
+          <h1 className="text-2xl font-light text-black">
+            Enlace no válido o reunión terminada
+          </h1>
+          <p className="text-neutral-600">
+            Pide un nuevo enlace a quien te invitó.
+          </p>
+          <p className="text-sm text-neutral-500 pt-4">
+            Link inválido ou reunião encerrada. Peça um novo link a quem te
+            convidou.
           </p>
         </div>
       </div>
-    </div>
+    );
+  }
+
+  return (
+    <RoomClient
+      roomId={roomId}
+      inviteToken={access.member ? null : inviteToken}
+      isTeamMember={Boolean(access.member)}
+    />
   );
 }

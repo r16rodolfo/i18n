@@ -1,3 +1,4 @@
+import type { SQLWrapper } from "drizzle-orm";
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
@@ -30,4 +31,6 @@ export const db = {
   update: (...args: Parameters<Database["update"]>) => getDb().update(...args),
   delete: (...args: Parameters<Database["delete"]>) => getDb().delete(...args),
   select: (...args: Parameters<Database["select"]>) => getDb().select(...args),
+  execute: <T extends Record<string, unknown>>(query: SQLWrapper | string) =>
+    getDb().execute<T>(query),
 };
