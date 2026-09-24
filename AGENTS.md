@@ -15,7 +15,9 @@ say how to test them.
 ## Tech Stack
 
 - **Runtime**: Bun (use `bun` instead of `npm`/`yarn`/`pnpm`)
-- **Framework**: Next.js 16 with App Router, hosted on **Vercel**
+- **Framework**: Next.js 16 with App Router, hosted on **Vercel** (project
+  `r16-meet` in the `r16bits` team, functions pinned to `gru1` São Paulo in
+  `vercel.json` to sit next to the Supabase `sa-east-1` database)
 - **Language**: TypeScript (strict mode)
 - **Styling**: Tailwind CSS v4 with shadcn/ui (new-york style)
 - **Database**: Drizzle ORM + **Supabase Postgres** via `postgres` (postgres-js)
