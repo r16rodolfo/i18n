@@ -10,9 +10,9 @@ import type { LanguageCode } from "@/lib/languages";
 // /api/elevenlabs/token (the API key stays on the server). Audio is only
 // sent between start() and stop(), so nobody pays for a muted mic.
 //
-// Speech is cut into short pieces (about 3 to 6 seconds) so each one can be
-// translated and shown while the person keeps talking: after 2.5 s of
-// speech we cut at the next short gap between words, and at 6 s we cut
+// Speech is cut into short pieces (about 2 to 4.5 seconds) so each one can
+// be translated and shown while the person keeps talking: after 1.8 s of
+// speech we cut at the next short gap between words, and at 4.5 s we cut
 // anyway. Scribe also ends a piece by itself after a longer silence, and
 // stop() pushes the last piece out right away ("Terminei").
 
@@ -25,8 +25,8 @@ const VOICE_LEVEL = 0.02;
 // ...and below which it counts as a gap between words
 const QUIET_LEVEL = 0.012;
 // Piece length: cut at the first gap after the minimum, always at the max
-const PIECE_MIN_MS = 2500;
-const PIECE_MAX_MS = 6000;
+const PIECE_MIN_MS = 1800;
+const PIECE_MAX_MS = 4500;
 // A gap this long between words is a good place to cut
 const WORD_GAP_MS = 150;
 // Tokens are valid for 15 min; keep a fresh one ready to connect instantly

@@ -11,7 +11,7 @@ import { isValidLanguageCode, type LanguageCode } from "@/lib/languages";
 import type { LiveTranscript, TranscriptEntry } from "../types";
 
 // Shares what each person says with everyone in the call, translated, like
-// TV subtitles: speech arrives in short finished pieces (3 to 6 seconds,
+// TV subtitles: speech arrives in short finished pieces (2 to 4.5 seconds,
 // see use-scribe) and each piece is shown once it is translated, without
 // being rewritten afterwards. The last two pieces stay on screen.
 //
@@ -33,6 +33,8 @@ const MAX_LINES = 2;
 const CAPTION_HOLD_MS = 7000;
 // If a translation doesn't come by then, show the original words
 const TRANSLATION_TIMEOUT_MS = 5000;
+// Earlier pieces sent to the translator as context
+const CONTEXT_PIECES = 6;
 
 type CaptionMessage =
   | { kind: typeof MESSAGE_KIND; type: "lang"; lang: string; ask?: boolean }
@@ -157,7 +159,14 @@ export function useCaptions({
     [setCaption],
   );
 
+  // Original words of the last pieces (everyone's), for translation context
+  const recentRef = useRef<string[]>([]);
+
   const addEntry = useCallback((entry: TranscriptEntry) => {
+    recentRef.current = [
+      ...recentRef.current,
+      entry.original.slice(0, 500),
+    ].slice(-CONTEXT_PIECES);
     setEntries((prev) => [...prev.slice(-(MAX_ENTRIES - 1)), entry]);
   }, []);
 
@@ -189,6 +198,8 @@ export function useCaptions({
   const publishFinal = useCallback(
     async (text: string) => {
       const id = nanoid(12);
+      // Before this piece is added to the list
+      const context = recentRef.current;
       const caption = captionFor(getMyId(), myName);
       setCaption({
         ...caption,
@@ -221,6 +232,7 @@ export function useCaptions({
               text,
               language: spokenLanguage,
               targets,
+              context,
               speakerName: myName,
               visitorId,
             }),

@@ -133,14 +133,15 @@ env var, and `none` if the chosen provider has no keys. Currently:
     language they want (`lang`). The speaker broadcasts partial/final text,
     then `POST /api/rooms/[roomId]/captions` translates the phrase into the
     listeners' languages (`src/lib/caption-translation.ts`, OpenAI
-    `OPENAI_TRANSLATION_MODEL`, default `gpt-5.4-mini`, reasoning off, 4
-    earlier phrases as context), saves it in `transcripts`, and returns the
-    translations, which the speaker broadcasts. `CaptionsBar` works like
+    `OPENAI_TRANSLATION_MODEL`, default `gpt-5.4-mini`, reasoning off,
+    priority service tier unless `OPENAI_TRANSLATION_PRIORITY=false`, the
+    browser sends the last 6 pieces as context), saves it in `transcripts`
+    after answering (`after()`), and returns the translations, which the speaker broadcasts. `CaptionsBar` works like
     TV subtitles: the last two finished pieces, each shown once translated
     and never rewritten. Listeners only ever see text in their own
     language (a "translating" hint meanwhile).
-  - Pieces: `use-scribe.ts` cuts speech into 2.5–6 s pieces (manual commit
-    at the first 150 ms gap between words after 2.5 s, forced at 6 s), so
+  - Pieces: `use-scribe.ts` cuts speech into 1.8–4.5 s pieces (manual commit
+    at the first 150 ms gap between words after 1.8 s, forced at 4.5 s), so
     translations flow while the person keeps talking.
   - Planned next: translated voice (ElevenLabs TTS, per-speaker
     female/male voice), glossary in `/admin`, agent reading `transcripts`.

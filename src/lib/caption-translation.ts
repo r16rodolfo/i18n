@@ -5,11 +5,15 @@ import type { LanguageCode } from "@/lib/languages";
 import { getLanguageName } from "@/lib/languages";
 
 // Translates live captions (ElevenLabs provider) with OpenAI. A small model
-// with no extra reasoning keeps each phrase at about a second; it can be
-// changed through OPENAI_TRANSLATION_MODEL without touching the code.
+// with no extra reasoning, on OpenAI's priority tier (steadier and faster:
+// about 0.8 s per piece, at a higher price per word), keeps the captions
+// close to the speech. Both can be changed through the environment:
+// OPENAI_TRANSLATION_MODEL, and OPENAI_TRANSLATION_PRIORITY=false.
 const translationModel = openai(
   process.env.OPENAI_TRANSLATION_MODEL || "gpt-5.4-mini",
 );
+const serviceTier =
+  process.env.OPENAI_TRANSLATION_PRIORITY === "false" ? "auto" : "priority";
 
 // How each language should sound for this audience
 const LANGUAGE_STYLE: Partial<Record<LanguageCode, string>> = {
@@ -54,7 +58,7 @@ export async function translateCaption({
     ].join("\n"),
     prompt: `${earlier}Phrase to translate:\n${text}`,
     maxOutputTokens: 800,
-    providerOptions: { openai: { reasoningEffort: "none" } },
+    providerOptions: { openai: { reasoningEffort: "none", serviceTier } },
   });
 
   return translated.trim();

@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { after } from "next/server";
 import { z } from "zod";
 
 import { db } from "@/db";
@@ -9,9 +9,10 @@ import { getRoomAccess } from "@/lib/room-access";
 import { getActiveTranslationProvider } from "@/lib/translation-providers";
 
 // A piece of speech from the speaker's browser (ElevenLabs provider):
-// translate it into the languages the others want to hear, save it in the
-// meeting transcript and send the translations back. The speaker then
-// shares them with everyone through Daily.
+// translate it into the languages the others want to hear and send the
+// translations back; the speaker then shares them with everyone through
+// Daily. The piece is saved in the meeting transcript after answering, so
+// the database never slows the captions down.
 
 const languageCode = z.string().refine(isValidLanguageCode);
 
@@ -22,12 +23,12 @@ const CaptionSchema = z.object({
   text: z.string().trim().min(1).max(2000),
   language: languageCode,
   targets: z.array(languageCode).max(5),
+  // The last few pieces of the meeting, oldest first, so short pieces make
+  // sense to the translator (sent by the browser to skip a database read)
+  context: z.array(z.string().max(500)).max(6).default([]),
   speakerName: z.string().trim().min(1).max(60),
   visitorId: z.string().min(1).max(100),
 });
-
-// Earlier pieces given to the translator so short pieces make sense
-const CONTEXT_PHRASES = 6;
 
 export async function POST(
   req: Request,
@@ -40,25 +41,20 @@ export async function POST(
   }
   const caption = parsed.data;
 
-  // Translation spends OpenAI credits: only while ElevenLabs is the provider
-  if ((await getActiveTranslationProvider()) !== "elevenlabs") {
+  // Translation spends OpenAI credits: only while ElevenLabs is the provider,
+  // and only for people who may use the room
+  const [provider, access] = await Promise.all([
+    getActiveTranslationProvider(),
+    getRoomAccess(roomId, caption.invite),
+  ]);
+  if (provider !== "elevenlabs") {
     return Response.json({ error: "Legendas desativadas" }, { status: 409 });
   }
-
-  const access = await getRoomAccess(roomId, caption.invite);
   if (!access) {
     return Response.json({ error: "Não autorizado" }, { status: 401 });
   }
   const { room } = access;
   const from = caption.language as LanguageCode;
-
-  const earlier = await db
-    .select({ text: transcripts.originalText })
-    .from(transcripts)
-    .where(eq(transcripts.roomId, room.id))
-    .orderBy(desc(transcripts.timestamp))
-    .limit(CONTEXT_PHRASES);
-  const context = earlier.map((row) => String(row.text)).reverse();
 
   const targets = [...new Set(caption.targets)].filter(
     (target) => target !== from,
@@ -72,7 +68,7 @@ export async function POST(
           text: caption.text,
           from,
           to,
-          context,
+          context: caption.context,
         });
         return text ? ([to, text] as const) : null;
       } catch (error) {
@@ -85,23 +81,25 @@ export async function POST(
     results.filter((entry) => entry !== null),
   );
 
-  try {
-    await db
-      .insert(transcripts)
-      .values({
-        id: caption.id,
-        roomId: room.id,
-        participantId: `${caption.visitorId}_${room.id}`,
-        speakerName: caption.speakerName,
-        originalText: caption.text,
-        originalLanguage: from,
-        translatedTexts: translations,
-      })
-      .onConflictDoNothing();
-  } catch (error) {
-    // The captions still work without the saved transcript
-    console.error("[captions] failed to save transcript:", error);
-  }
+  after(async () => {
+    try {
+      await db
+        .insert(transcripts)
+        .values({
+          id: caption.id,
+          roomId: room.id,
+          participantId: `${caption.visitorId}_${room.id}`,
+          speakerName: caption.speakerName,
+          originalText: caption.text,
+          originalLanguage: from,
+          translatedTexts: translations,
+        })
+        .onConflictDoNothing();
+    } catch (error) {
+      // The captions still work without the saved transcript
+      console.error("[captions] failed to save transcript:", error);
+    }
+  });
 
   return Response.json({ translations });
 }
