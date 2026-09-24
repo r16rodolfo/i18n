@@ -51,6 +51,10 @@ export function useTranscription({
   const sourceNodesRef = useRef<Map<string, MediaStreamAudioSourceNode>>(
     new Map(),
   );
+  // Remote audio tracks by participant, kept even before the mixer exists:
+  // someone already in the room can start sending audio before Palabra is
+  // set up, and their track must not be lost.
+  const remoteTracksRef = useRef<Map<string, MediaStreamTrack>>(new Map());
 
   const [transcripts, setTranscripts] = useState<TranscriptEntry[]>([]);
   const [liveTranscript, setLiveTranscript] = useState<LiveTranscript | null>(
@@ -66,9 +70,23 @@ export function useTranscription({
     try {
       // Create AudioContext to mix remote participant audio
       const audioContext = new AudioContext();
+      // Browsers may start it suspended (autoplay rules); a suspended
+      // context feeds silence to the translator.
+      if (audioContext.state === "suspended") {
+        await audioContext.resume().catch(() => {});
+      }
       const mixerDest = audioContext.createMediaStreamDestination();
       audioContextRef.current = audioContext;
       mixerDestRef.current = mixerDest;
+
+      // Connect remote tracks that arrived before the mixer existed
+      for (const [participantId, track] of remoteTracksRef.current) {
+        const source = audioContext.createMediaStreamSource(
+          new MediaStream([track]),
+        );
+        source.connect(mixerDest);
+        sourceNodesRef.current.set(participantId, source);
+      }
 
       // The SDK talks to our /api/palabra proxy, which holds the Palabra
       // secret. This "token" only says which room we are in (and, for guests,
@@ -304,6 +322,8 @@ export function useTranscription({
   // Connect a remote participant's audio track to the Palabra mixer
   const addRemoteTrack = useCallback(
     (participantId: string, track: MediaStreamTrack) => {
+      remoteTracksRef.current.set(participantId, track);
+
       const ctx = audioContextRef.current;
       const dest = mixerDestRef.current;
       if (!ctx || !dest) return;
@@ -323,6 +343,7 @@ export function useTranscription({
 
   // Disconnect a remote participant's audio track from the mixer
   const removeRemoteTrack = useCallback((participantId: string) => {
+    remoteTracksRef.current.delete(participantId);
     const source = sourceNodesRef.current.get(participantId);
     if (source) {
       source.disconnect();

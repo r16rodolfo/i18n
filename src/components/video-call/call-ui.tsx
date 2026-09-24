@@ -67,10 +67,11 @@ export function CallUI({
     inviteToken,
   });
 
-  // The original voice is muted only while Palabra's translated voice is
-  // really playing. While it starts, or if it fails, everyone hears the
-  // original audio instead of silence.
+  // The original voice is only turned down (never cut) while Palabra's
+  // translated voice is really playing. While it starts, or if it fails,
+  // everyone hears the original audio at full volume instead of silence.
   const translatedVoiceActive = usePalabra && transcriptionStatus === "active";
+  const originalVolume = translatedVoiceActive ? 0.15 : 1;
 
   // Proactive intent detection for email actions (team only: the agent
   // routes spend OpenAI credits and can send e-mail)
@@ -229,7 +230,7 @@ export function CallUI({
             <ParticipantTile
               key={id}
               sessionId={id}
-              playAudio={!translatedVoiceActive}
+              originalVolume={originalVolume}
             />
           ))}
         </div>
