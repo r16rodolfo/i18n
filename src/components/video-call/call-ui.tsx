@@ -15,12 +15,19 @@ import { uiLangFor, uiText } from "@/lib/ui-text";
 import { AgentPanel } from "@/components/agent-panel";
 
 import { CallControls } from "./call-controls";
+import { CaptionsBar } from "./captions-bar";
 import { EmailConfirmDialog } from "./email-confirm-dialog";
+import { useCaptions } from "./hooks/use-captions";
+import { useFloor } from "./hooks/use-floor";
 import { useIntentDetection } from "./hooks/use-intent-detection";
+import { useScribe } from "./hooks/use-scribe";
 import { useTranscription } from "./hooks/use-transcription";
 import { ParticipantTile } from "./participant-tile";
 import { ShareModal } from "./share-modal";
 import type { VideoCallProps } from "./types";
+
+// Silence (in ms) after which whoever has the floor gives it back
+const FLOOR_AUTO_RELEASE_MS = 8000;
 
 export function CallUI({
   roomUrl,
@@ -48,6 +55,8 @@ export function CallUI({
   // With Palabra, others are heard only through the translated voice.
   // Otherwise the original audio of each participant is played.
   const usePalabra = translationProvider === "palabra";
+  // With ElevenLabs, each person's mic is transcribed and shared as captions
+  const useElevenLabs = translationProvider === "elevenlabs";
 
   const {
     transcripts,
@@ -73,11 +82,48 @@ export function CallUI({
   const translatedVoiceActive = usePalabra && transcriptionStatus === "active";
   const originalVolume = translatedVoiceActive ? 0.15 : 1;
 
+  // ElevenLabs: captions shared through Daily, floor control, your mic
+  const inCall = !isJoining;
+  const captions = useCaptions({
+    daily,
+    ready: inCall && useElevenLabs,
+    myName: username,
+  });
+  const floor = useFloor({
+    daily,
+    enabledByDefault: useElevenLabs,
+    myName: username,
+    ready: inCall && useElevenLabs,
+  });
+  const scribe = useScribe({
+    enabled: useElevenLabs,
+    roomId,
+    inviteToken,
+    language: spokenLanguage,
+    onPartial: captions.publishPartial,
+    onCommitted: captions.publishFinal,
+  });
+  const floorActive = useElevenLabs && floor.floorMode;
+  // Is your mic open? With the floor control on, only while you have the
+  // floor; otherwise it follows the mute button.
+  const micOpen = floorActive ? floor.iHold : !isMuted;
+
+  // What the agent panel and the e-mail detection read
+  const callTranscripts = useElevenLabs ? captions.entries : transcripts;
+  const callLiveTranscript = useElevenLabs ? captions.live : liveTranscript;
+  const callTranscriptionStatus = useElevenLabs
+    ? scribe.status === "error"
+      ? "error"
+      : "active"
+    : usePalabra
+      ? transcriptionStatus
+      : "stopped";
+
   // Proactive intent detection for email actions (team only: the agent
   // routes spend OpenAI credits and can send e-mail)
   const { detectedEmail, dismissEmail } = useIntentDetection({
     roomId,
-    transcripts,
+    transcripts: callTranscripts,
     enabled: !isJoining && isTeamMember,
   });
 
@@ -162,14 +208,34 @@ export function CallUI({
     removeRemoteTrack(participant.session_id);
   });
 
-  // Mic toggle - controls both Daily.co (voice to others) and Palabra (local transcription)
+  // Open/close your mic in the call, and the ElevenLabs transcription with it
+  const { start: startScribe, stop: stopScribe } = scribe;
+  useEffect(() => {
+    if (!daily || isJoining) return;
+    daily.setLocalAudio(micOpen);
+    if (!useElevenLabs) return;
+    if (micOpen) startScribe();
+    else stopScribe();
+  }, [daily, isJoining, micOpen, useElevenLabs, startScribe, stopScribe]);
+
+  // Give the floor back after a long silence, so nobody stays locked out
+  const { iHold, release: releaseFloor } = floor;
+  const { getSilenceMs } = scribe;
+  useEffect(() => {
+    if (!floorActive || !iHold) return;
+    const timer = setInterval(() => {
+      if (getSilenceMs() > FLOOR_AUTO_RELEASE_MS) releaseFloor();
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [floorActive, iHold, getSilenceMs, releaseFloor]);
+
+  // Mic toggle (when the floor control is off): Daily follows micOpen above;
+  // Palabra transcribes its own copy of the mic
   const toggleMute = useCallback(() => {
-    if (!daily) return;
     const newMutedState = !isMuted;
-    daily.setLocalAudio(!newMutedState);
     setPalabraMuted(newMutedState);
     setIsMuted(newMutedState);
-  }, [daily, isMuted, setPalabraMuted]);
+  }, [isMuted, setPalabraMuted]);
 
   const toggleVideo = useCallback(() => {
     if (!daily) return;
@@ -205,7 +271,7 @@ export function CallUI({
       )}
 
       {/* Video grid - takes remaining space */}
-      <div className="flex-1 p-4 pb-0 overflow-hidden">
+      <div className="relative flex-1 p-4 pb-0 overflow-hidden">
         <div
           className={`grid gap-4 h-full ${
             participantIds.length === 0
@@ -234,15 +300,33 @@ export function CallUI({
             />
           ))}
         </div>
+
+        {useElevenLabs && (
+          <CaptionsBar
+            caption={captions.live}
+            floorStatus={
+              floorActive
+                ? {
+                    iHold: floor.iHold,
+                    holderName: floor.iHold
+                      ? null
+                      : (floor.holder?.name ?? null),
+                  }
+                : null
+            }
+            hasError={scribe.status === "error"}
+            uiLang={uiLang}
+          />
+        )}
       </div>
 
       {/* Floating agent panel (team only) */}
       {isTeamMember && (
         <AgentPanel
           preferredLanguage={preferredLanguage}
-          transcripts={transcripts}
-          liveTranscript={liveTranscript}
-          transcriptionStatus={usePalabra ? transcriptionStatus : "stopped"}
+          transcripts={callTranscripts}
+          liveTranscript={callLiveTranscript}
+          transcriptionStatus={callTranscriptionStatus}
           roomId={roomId}
         />
       )}
@@ -256,6 +340,26 @@ export function CallUI({
         onToggleVideo={toggleVideo}
         onLeave={leaveCall}
         onShowShare={invitePath ? () => setShowShareModal(true) : undefined}
+        floor={
+          floorActive
+            ? {
+                iHold: floor.iHold,
+                otherHolderName: floor.iHold
+                  ? null
+                  : (floor.holder?.name ?? null),
+                onTake: floor.take,
+                onRelease: floor.release,
+              }
+            : undefined
+        }
+        floorToggle={
+          useElevenLabs && isTeamMember
+            ? {
+                enabled: floor.floorMode,
+                onToggle: () => floor.setFloorMode(!floor.floorMode),
+              }
+            : undefined
+        }
         uiLang={uiLang}
       />
 

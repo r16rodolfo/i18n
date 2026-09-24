@@ -67,6 +67,16 @@ const TEXT = {
     leave: "Sair da chamada",
     speaking: "falando...",
     waitingForSpeech: "Aguardando fala...",
+    floorTake: "Falar",
+    floorRelease: "Terminei",
+    floorBusy: (name: string) => `${name} está falando`,
+    floorHolder: (name: string) => `${name} está com a palavra`,
+    floorYouHold: "Você está com a palavra. Clique em Terminei quando acabar.",
+    floorFree: "Para falar, clique em Falar",
+    floorLockOn: "Trava de fala ligada (clique para desligar)",
+    floorLockOff: "Trava de fala desligada (clique para ligar)",
+    captionsError:
+      "A transcrição não está funcionando. Tente sair e entrar de novo.",
   },
   es: {
     joinEyebrow: "[ UNIRSE A LA REUNIÓN ]",
@@ -94,6 +104,16 @@ const TEXT = {
     leave: "Salir de la llamada",
     speaking: "hablando...",
     waitingForSpeech: "Esperando que alguien hable...",
+    floorTake: "Hablar",
+    floorRelease: "Terminé",
+    floorBusy: (name: string) => `${name} está hablando`,
+    floorHolder: (name: string) => `${name} tiene la palabra`,
+    floorYouHold: "Tienes la palabra. Haz clic en Terminé cuando acabes.",
+    floorFree: "Para hablar, haz clic en Hablar",
+    floorLockOn: "Turno de palabra activado (clic para desactivar)",
+    floorLockOff: "Turno de palabra desactivado (clic para activar)",
+    captionsError:
+      "La transcripción no está funcionando. Intenta salir y volver a entrar.",
   },
 } satisfies Record<UiLang, Record<string, unknown>>;
 

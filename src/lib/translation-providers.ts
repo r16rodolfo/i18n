@@ -81,9 +81,18 @@ export async function getSelectedTranslationProvider(): Promise<TranslationProvi
   return "none";
 }
 
+// Local development only: DEV_TRANSLATION_PROVIDER wins over the admin's
+// choice. The local app shares the production database, so testing a
+// provider through /admin would change it for real meetings too.
+function devOverride(): TranslationProvider | null {
+  if (process.env.NODE_ENV !== "development") return null;
+  const value = process.env.DEV_TRANSLATION_PROVIDER?.trim();
+  return isTranslationProvider(value) ? value : null;
+}
+
 // The provider calls actually use: falls back to "none" if keys are missing
 export async function getActiveTranslationProvider(): Promise<TranslationProvider> {
-  const selected = await getSelectedTranslationProvider();
+  const selected = devOverride() ?? (await getSelectedTranslationProvider());
 
   if (!isConfigured(selected)) {
     console.warn(

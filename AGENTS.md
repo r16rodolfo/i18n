@@ -119,10 +119,24 @@ env var, and `none` if the chosen provider has no keys. Currently:
   body `{ room, invite }`). OpenAI translates the text. Keys:
   `ELEVENLABS_API_KEY` (restricted to Speech to Text) + `OPENAI_API_KEY`
   (`src/lib/elevenlabs.ts`). The admin panel checks the key by creating a
-  token before enabling it. Planned next: floor control ("Falar"/"Terminei",
-  others auto-muted, release = manual commit), captions + transcripts saved
-  in `transcripts`, translated voice (ElevenLabs TTS, per-speaker
-  female/male voice), glossary in `/admin`.
+  token before enabling it.
+  - `use-scribe.ts`: mic → AudioWorklet → PCM at the context's own rate →
+    Scribe (`commit_strategy=vad`, 0.8 s pause ends a phrase). Audio is only
+    sent while the mic is open; `stop()` sends a final commit so the last
+    phrase comes out right away. One unused token is kept ready.
+  - `use-floor.ts`: floor control ("trava de fala"), on by default. "Falar"
+    takes the floor and closes everyone else's mic; "Terminei" or 8 s of
+    silence releases it. No server: state is synced with Daily app messages
+    (`kind: "r16-floor"`), sender taken from Daily's `fromId`, earliest
+    claim wins. Team members can turn it off for everyone (hand icon).
+  - `use-captions.ts`: each browser broadcasts its own partial/final text
+    (`kind: "r16-caption"`); `CaptionsBar` shows it over the video.
+  - Planned next: translation by OpenAI + transcripts saved in
+    `transcripts`, translated voice (ElevenLabs TTS, per-speaker
+    female/male voice), glossary in `/admin`.
+  - Local testing: the local app shares the production DB, so don't pick
+    ElevenLabs in the local `/admin`; set `DEV_TRANSLATION_PROVIDER` in
+    `.env.local` instead (ignored outside `bun dev`).
 
 **Palabra is a permanent option; never remove it.** The owner wants to
 choose among several providers in the admin panel. To add a provider:
