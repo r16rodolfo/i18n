@@ -129,11 +129,16 @@ env var, and `none` if the chosen provider has no keys. Currently:
     silence releases it. No server: state is synced with Daily app messages
     (`kind: "r16-floor"`), sender taken from Daily's `fromId`, earliest
     claim wins. Team members can turn it off for everyone (hand icon).
-  - `use-captions.ts`: each browser broadcasts its own partial/final text
-    (`kind: "r16-caption"`); `CaptionsBar` shows it over the video.
-  - Planned next: translation by OpenAI + transcripts saved in
-    `transcripts`, translated voice (ElevenLabs TTS, per-speaker
-    female/male voice), glossary in `/admin`.
+  - `use-captions.ts` (`kind: "r16-caption"`): everyone announces the
+    language they want (`lang`). The speaker broadcasts partial/final text,
+    then `POST /api/rooms/[roomId]/captions` translates the phrase into the
+    listeners' languages (`src/lib/caption-translation.ts`, OpenAI
+    `OPENAI_TRANSLATION_MODEL`, default `gpt-5.4-mini`, reasoning off, 4
+    earlier phrases as context), saves it in `transcripts`, and returns the
+    translations, which the speaker broadcasts. `CaptionsBar` shows the
+    translation with the original underneath.
+  - Planned next: translated voice (ElevenLabs TTS, per-speaker
+    female/male voice), glossary in `/admin`, agent reading `transcripts`.
   - Local testing: the local app shares the production DB, so don't pick
     ElevenLabs in the local `/admin`; set `DEV_TRANSLATION_PROVIDER` in
     `.env.local` instead (ignored outside `bun dev`).
@@ -151,11 +156,10 @@ every new table.
 
 ### Known gaps (planned)
 - Agent routes still receive the transcript from the client instead of
-  reading it from the DB (fixed with phase 3, when transcripts are stored).
+  reading it from the DB. Transcripts are now stored (ElevenLabs provider);
+  switching the agent to read them is the last step of phase 3.
 - The in-call agent panel and e-mail dialog are still partly in English
   (team-only screens).
-- Phase 3: translated captions + original voice (streaming STT + LLM with a
-  glossary), transcripts persisted in `transcripts`.
 - `/[roomId]/agent` page is currently broken (calls `/actions` with GET and
   the chat without transcripts); fixed once transcripts live in the DB.
 

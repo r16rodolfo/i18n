@@ -13,6 +13,8 @@ interface CaptionsBarProps {
   // Floor control status line; null when the floor control is off
   floorStatus: { iHold: boolean; holderName: string | null } | null;
   hasError: boolean;
+  // Leave room at the bottom for the team's "Show Agent" button
+  raised: boolean;
   uiLang: UiLang;
 }
 
@@ -22,6 +24,7 @@ export function CaptionsBar({
   caption,
   floorStatus,
   hasError,
+  raised,
   uiLang,
 }: CaptionsBarProps) {
   const t = uiText(uiLang);
@@ -39,7 +42,12 @@ export function CaptionsBar({
   if (!status && !caption) return null;
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-4 z-40 flex flex-col items-center gap-2 px-4">
+    <div
+      className={cn(
+        "pointer-events-none absolute inset-x-0 z-40 flex flex-col items-center gap-2 px-4",
+        raised ? "bottom-16" : "bottom-4",
+      )}
+    >
       {status && (
         <p
           className={cn(
@@ -69,11 +77,21 @@ export function CaptionsBar({
           <p
             className={cn(
               "text-lg leading-snug",
-              caption.final ? "text-white" : "text-white/70 italic",
+              caption.final && !caption.translating
+                ? "text-white"
+                : "text-white/70 italic",
             )}
           >
             {caption.text}
           </p>
+          {caption.translating && (
+            <p className="mt-1 text-xs text-white/50">{t.translating}</p>
+          )}
+          {caption.original && caption.original !== caption.text && (
+            <p className="mt-1 text-sm leading-snug text-white/50">
+              {caption.original}
+            </p>
+          )}
         </div>
       )}
     </div>

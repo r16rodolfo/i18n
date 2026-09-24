@@ -35,6 +35,7 @@ export function CallUI({
   spokenLanguage,
   preferredLanguage,
   username,
+  visitorId,
   roomId,
   translationProvider,
   inviteToken,
@@ -88,6 +89,11 @@ export function CallUI({
     daily,
     ready: inCall && useElevenLabs,
     myName: username,
+    spokenLanguage,
+    preferredLanguage,
+    roomId,
+    inviteToken,
+    visitorId,
   });
   const floor = useFloor({
     daily,
@@ -315,6 +321,7 @@ export function CallUI({
                 : null
             }
             hasError={scribe.status === "error"}
+            raised={isTeamMember}
             uiLang={uiLang}
           />
         )}
