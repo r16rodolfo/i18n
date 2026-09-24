@@ -5,6 +5,7 @@ import {
   CaptionsOff,
   Hand,
   Info,
+  MessageSquareText,
   Mic,
   MicOff,
   PhoneOff,
@@ -33,6 +34,12 @@ export interface CaptionsToggle {
   onToggle: () => void;
 }
 
+// Open/close the transcript column
+export interface TranscriptToggle {
+  open: boolean;
+  onToggle: () => void;
+}
+
 // Team only: turn the floor control on/off for everyone
 export interface FloorToggle {
   enabled: boolean;
@@ -51,6 +58,7 @@ interface CallControlsProps {
   floor?: FloorControls;
   floorToggle?: FloorToggle;
   captionsToggle?: CaptionsToggle;
+  transcriptToggle?: TranscriptToggle;
   uiLang: UiLang;
 }
 
@@ -65,6 +73,7 @@ export function CallControls({
   floor,
   floorToggle,
   captionsToggle,
+  transcriptToggle,
   uiLang,
 }: CallControlsProps) {
   const t = uiText(uiLang);
@@ -150,6 +159,25 @@ export function CallControls({
             ) : (
               <CaptionsOff className="w-5 h-5" />
             )}
+          </button>
+        )}
+        {transcriptToggle && (
+          <button
+            type="button"
+            onClick={transcriptToggle.onToggle}
+            className={cn(
+              "p-2 rounded-lg transition-colors cursor-pointer hover:bg-white/10",
+              transcriptToggle.open
+                ? "text-white hover:text-white"
+                : "text-white/50 hover:text-white",
+            )}
+            title={transcriptToggle.open ? t.transcriptHide : t.transcriptShow}
+            aria-label={
+              transcriptToggle.open ? t.transcriptHide : t.transcriptShow
+            }
+            aria-pressed={transcriptToggle.open}
+          >
+            <MessageSquareText className="w-5 h-5" />
           </button>
         )}
         {floorToggle && (

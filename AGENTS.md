@@ -90,7 +90,10 @@ All documented in `.env.example` (copy to `.env.local`). Key rules:
    room), the active `translationProvider`, and for the team the invite link.
 3. `CallUI` joins Daily. Remote audio is played by `ParticipantTile`
    unless the provider replaces it (Palabra).
-4. Agent (team only, UI hidden from guests): `/api/agent/[roomId]` (chat),
+4. Transcript column on the right (`transcript-sidebar.tsx`, docked on
+   wide screens, full-screen on phones, toggled from the controls): the
+   meeting transcript for everyone, in each reader's language. Agent (team
+   only, inside that column): `/api/agent/[roomId]` (chat),
    `/intent` (email intent detection), `/actions` (action items),
    `/actions/execute` (send email via Resend; recipients must be confirmed by
    the user, never hardcoded).
@@ -210,7 +213,7 @@ src/
 │   ├── ui/                     # shadcn/ui (DO NOT EDIT directly)
 │   ├── providers/              # TanStack Query provider
 │   ├── video-call/             # CallUI, tiles, controls, hooks
-│   └── agent-panel.tsx         # in-call AI chat overlay
+│   (video-call/transcript-sidebar.tsx: transcript column + team AI agent)
 ├── db/
 │   ├── index.ts                # postgres-js + Drizzle client (lazy)
 │   └── schema.ts               # tables (all with RLS enabled)

@@ -12,8 +12,6 @@ import { Loader2 } from "lucide-react";
 
 import { uiLangFor, uiText } from "@/lib/ui-text";
 
-import { AgentPanel } from "@/components/agent-panel";
-
 import { CallControls } from "./call-controls";
 import { CaptionsBar } from "./captions-bar";
 import { EmailConfirmDialog } from "./email-confirm-dialog";
@@ -25,6 +23,7 @@ import { useSoniox } from "./hooks/use-soniox";
 import { useTranscription } from "./hooks/use-transcription";
 import { ParticipantTile } from "./participant-tile";
 import { ShareModal } from "./share-modal";
+import { TranscriptSidebar } from "./transcript-sidebar";
 import type { VideoCallProps } from "./types";
 
 // Silence (in ms) after which whoever has the floor gives it back
@@ -63,6 +62,12 @@ export function CallUI({
     } catch {
       // Storage blocked: keep them on
     }
+  }, []);
+  // Transcript column: open on wide screens, closed on phones (it would
+  // cover the videos there)
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
+  useEffect(() => {
+    setTranscriptOpen(window.matchMedia("(min-width: 1024px)").matches);
   }, []);
   const toggleCaptions = useCallback(() => {
     setShowCaptions((current) => {
@@ -159,13 +164,6 @@ export function CallUI({
   const callLiveTranscript = liveCaptions
     ? liveTranscriptOf(captions.live)
     : liveTranscript;
-  const callTranscriptionStatus = liveCaptions
-    ? engine.status === "error"
-      ? "error"
-      : "active"
-    : usePalabra
-      ? transcriptionStatus
-      : "stopped";
 
   // Proactive intent detection for email actions (team only: the agent
   // routes spend OpenAI credits and can send e-mail)
@@ -318,69 +316,72 @@ export function CallUI({
         </div>
       )}
 
-      {/* Video grid - takes remaining space */}
-      <div className="relative flex-1 p-4 pb-0 overflow-hidden">
-        <div
-          className={`grid gap-4 h-full ${
-            participantIds.length === 0
-              ? "grid-cols-1"
-              : participantIds.length === 1
-                ? "grid-cols-2"
-                : "grid-cols-2 grid-rows-2"
-          }`}
-        >
-          {/* Local participant */}
-          {localParticipant && (
-            <ParticipantTile
-              sessionId={localParticipant.session_id}
-              username={username}
-              isLocal
-              preferredLanguage={preferredLanguage}
+      <div className="relative flex min-h-0 flex-1">
+        {/* Video grid - takes remaining space */}
+        <div className="relative min-w-0 flex-1 p-4 pb-0 overflow-hidden">
+          <div
+            className={`grid gap-4 h-full ${
+              participantIds.length === 0
+                ? "grid-cols-1"
+                : participantIds.length === 1
+                  ? "grid-cols-2"
+                  : "grid-cols-2 grid-rows-2"
+            }`}
+          >
+            {/* Local participant */}
+            {localParticipant && (
+              <ParticipantTile
+                sessionId={localParticipant.session_id}
+                username={username}
+                isLocal
+                preferredLanguage={preferredLanguage}
+              />
+            )}
+
+            {/* Remote participants */}
+            {participantIds.map((id) => (
+              <ParticipantTile
+                key={id}
+                sessionId={id}
+                originalVolume={originalVolume}
+              />
+            ))}
+          </div>
+
+          {liveCaptions && (
+            <CaptionsBar
+              caption={showCaptions ? captions.live : null}
+              floorStatus={
+                floorActive
+                  ? {
+                      iHold: floor.iHold,
+                      holderName: floor.iHold
+                        ? null
+                        : (floor.holder?.name ?? null),
+                    }
+                  : null
+              }
+              hasError={engine.status === "error"}
+              uiLang={uiLang}
             />
           )}
-
-          {/* Remote participants */}
-          {participantIds.map((id) => (
-            <ParticipantTile
-              key={id}
-              sessionId={id}
-              originalVolume={originalVolume}
-            />
-          ))}
         </div>
 
-        {liveCaptions && (
-          <CaptionsBar
-            caption={showCaptions ? captions.live : null}
-            floorStatus={
-              floorActive
-                ? {
-                    iHold: floor.iHold,
-                    holderName: floor.iHold
-                      ? null
-                      : (floor.holder?.name ?? null),
-                  }
-                : null
-            }
-            hasError={engine.status === "error"}
-            raised={showTranscriptPanel}
-            uiLang={uiLang}
-          />
+        {/* Transcript column (+ AI agent for the team): docked on the right
+          on wide screens, over the videos on phones */}
+        {showTranscriptPanel && transcriptOpen && (
+          <div className="absolute inset-0 z-50 lg:static lg:z-auto lg:w-96 lg:shrink-0">
+            <TranscriptSidebar
+              transcripts={callTranscripts}
+              liveTranscript={callLiveTranscript}
+              roomId={roomId}
+              showAgent={isTeamMember}
+              uiLang={uiLang}
+              onClose={() => setTranscriptOpen(false)}
+            />
+          </div>
         )}
       </div>
-
-      {/* Floating transcript panel (+ AI agent for the team) */}
-      {showTranscriptPanel && (
-        <AgentPanel
-          preferredLanguage={preferredLanguage}
-          transcripts={callTranscripts}
-          liveTranscript={callLiveTranscript}
-          transcriptionStatus={callTranscriptionStatus}
-          roomId={roomId}
-          showAgent={isTeamMember}
-          uiLang={uiLang}
-        />
-      )}
 
       {/* Controls */}
       <CallControls
@@ -400,6 +401,14 @@ export function CallUI({
                   : (floor.holder?.name ?? null),
                 onTake: floor.take,
                 onRelease: floor.release,
+              }
+            : undefined
+        }
+        transcriptToggle={
+          showTranscriptPanel
+            ? {
+                open: transcriptOpen,
+                onToggle: () => setTranscriptOpen((open) => !open),
               }
             : undefined
         }
