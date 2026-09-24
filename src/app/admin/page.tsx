@@ -74,9 +74,9 @@ export default async function AdminPage({
               role="alert"
               className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
             >
-              A Palabra recusou as chaves configuradas na Vercel
-              (PALABRA_CLIENT_ID e PALABRA_CLIENT_SECRET). Ela não foi ativada:
-              confira as chaves no painel da Palabra e tente de novo.
+              A Palabra recusou a chave configurada na Vercel (PALABRA_API_KEY).
+              Ela não foi ativada: confira a chave no painel da Palabra e tente
+              de novo.
             </p>
           )}
 

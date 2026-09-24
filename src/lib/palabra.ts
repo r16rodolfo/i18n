@@ -2,12 +2,28 @@
 
 export const PALABRA_API = "https://api.palabra.ai";
 
-export function palabraHeaders() {
+// Palabra accepts either the newer single API key (plbr_..., sent as a
+// Bearer token) or the older ClientId + ClientSecret pair.
+export function palabraHeaders(): Record<string, string> {
+  const apiKey = process.env.PALABRA_API_KEY?.trim();
+  if (apiKey) {
+    return {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    };
+  }
   return {
     ClientId: process.env.PALABRA_CLIENT_ID ?? "",
     ClientSecret: process.env.PALABRA_CLIENT_SECRET ?? "",
     "Content-Type": "application/json",
   };
+}
+
+export function hasPalabraKeys(): boolean {
+  return Boolean(
+    process.env.PALABRA_API_KEY?.trim() ||
+      (process.env.PALABRA_CLIENT_ID && process.env.PALABRA_CLIENT_SECRET),
+  );
 }
 
 // Checks that Palabra accepts our keys by opening and closing a session.
