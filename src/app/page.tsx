@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 
 import { DeleteRoomButton } from "./delete-room-button";
 import { NewMeetingButton } from "./new-meeting-button";
+import { RoomEntryButtons } from "./room-entry-buttons";
 
 export const metadata = { title: "R16 Meet" };
 
@@ -72,7 +73,12 @@ export default async function HomePage() {
                         ` · fecha às ${timeFormat.format(room.expiresAt)}`}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <RoomEntryButtons
+                      roomName={room.dailyRoomName}
+                      locked={Boolean(room.lockedAt)}
+                      entryMode={room.entryMode}
+                    />
                     {room.inviteToken && (
                       <CopyInviteButton
                         invitePath={`/${room.dailyRoomName}?convite=${room.inviteToken}`}
