@@ -1,0 +1,104 @@
+import type { LanguageCode } from "@/lib/languages";
+
+// Interface language. The R16 team uses Portuguese; guests (Paraguayan
+// clients) see Spanish by default. Only the screens guests can reach need
+// both languages; team-only screens are written in Portuguese directly.
+export type UiLang = "pt" | "es";
+
+export function uiLangFor(spokenLanguage: LanguageCode): UiLang {
+  return spokenLanguage === "pt" ? "pt" : "es";
+}
+
+const LANGUAGE_NAMES: Record<UiLang, Record<LanguageCode, string>> = {
+  pt: {
+    en: "Inglês",
+    es: "Espanhol",
+    pt: "Português",
+    fr: "Francês",
+    de: "Alemão",
+    it: "Italiano",
+    ja: "Japonês",
+    ko: "Coreano",
+    zh: "Chinês",
+    ar: "Árabe",
+  },
+  es: {
+    en: "Inglés",
+    es: "Español",
+    pt: "Portugués",
+    fr: "Francés",
+    de: "Alemán",
+    it: "Italiano",
+    ja: "Japonés",
+    ko: "Coreano",
+    zh: "Chino",
+    ar: "Árabe",
+  },
+};
+
+export function languageName(code: LanguageCode, lang: UiLang): string {
+  return LANGUAGE_NAMES[lang][code] ?? code.toUpperCase();
+}
+
+const TEXT = {
+  pt: {
+    joinEyebrow: "[ ENTRAR NA REUNIÃO ]",
+    joinTitle: "Reunião R16",
+    joinSubtitle: "Informe seu nome e os idiomas",
+    yourName: "Seu nome",
+    yourNamePlaceholder: "Digite seu nome",
+    iSpeak: "Eu vou falar em",
+    iHear: "Quero ouvir em",
+    selectLanguage: "Escolha o idioma",
+    loading: "Carregando...",
+    joining: "Entrando...",
+    joinCall: "Entrar na chamada",
+    summary: (speak: string, hear: string) =>
+      `Você vai falar em ${speak} e ouvir os outros em ${hear}`,
+    joinFailed: "Não foi possível entrar na chamada",
+    invalidLink: "Este link não é válido ou a reunião já terminou.",
+    joiningCall: "Entrando na chamada...",
+    hearingIn: (language: string) => `Ouvindo em ${language}`,
+    shareLink: "Compartilhar link da reunião",
+    mute: "Desligar microfone",
+    unmute: "Ligar microfone",
+    cameraOff: "Desligar câmera",
+    cameraOn: "Ligar câmera",
+    leave: "Sair da chamada",
+    speaking: "falando...",
+    waitingForSpeech: "Aguardando fala...",
+  },
+  es: {
+    joinEyebrow: "[ UNIRSE A LA REUNIÓN ]",
+    joinTitle: "Reunión R16",
+    joinSubtitle: "Escribe tu nombre y elige los idiomas",
+    yourName: "Tu nombre",
+    yourNamePlaceholder: "Escribe tu nombre",
+    iSpeak: "Voy a hablar en",
+    iHear: "Quiero escuchar en",
+    selectLanguage: "Elige el idioma",
+    loading: "Cargando...",
+    joining: "Entrando...",
+    joinCall: "Unirse a la llamada",
+    summary: (speak: string, hear: string) =>
+      `Vas a hablar en ${speak} y escuchar a los demás en ${hear}`,
+    joinFailed: "No fue posible unirse a la llamada",
+    invalidLink: "Este enlace no es válido o la reunión ya terminó.",
+    joiningCall: "Entrando a la llamada...",
+    hearingIn: (language: string) => `Escuchando en ${language}`,
+    shareLink: "Compartir enlace de la reunión",
+    mute: "Apagar micrófono",
+    unmute: "Encender micrófono",
+    cameraOff: "Apagar cámara",
+    cameraOn: "Encender cámara",
+    leave: "Salir de la llamada",
+    speaking: "hablando...",
+    waitingForSpeech: "Esperando que alguien hable...",
+  },
+} satisfies Record<UiLang, Record<string, unknown>>;
+
+export type UiText = (typeof TEXT)["pt"];
+
+export function uiText(lang: UiLang): UiText {
+  return TEXT[lang];
+}

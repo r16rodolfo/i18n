@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { ActionsRequestSchema } from "@/lib/agent-schemas";
 import { chatModel } from "@/lib/ai";
+import { getTeamMember, unauthorized } from "@/lib/auth";
 
 const ActionItemSchema = z.object({
   actions: z.array(
@@ -28,6 +29,9 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ roomId: string }> },
 ) {
+  // Team only: these routes spend OpenAI credits and can send e-mail
+  if (!(await getTeamMember())) return unauthorized();
+
   try {
     const { roomId } = await params;
     const body = await req.json();

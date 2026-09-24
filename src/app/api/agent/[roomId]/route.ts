@@ -8,6 +8,7 @@ import {
 import { ChatRequestSchema } from "@/lib/agent-schemas";
 import { chatModel } from "@/lib/ai";
 import { webSearchTool } from "@/tools/web-search";
+import { getTeamMember, unauthorized } from "@/lib/auth";
 
 export const maxDuration = 30;
 
@@ -15,6 +16,9 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ roomId: string }> },
 ) {
+  // Team only: these routes spend OpenAI credits and can send e-mail
+  if (!(await getTeamMember())) return unauthorized();
+
   try {
     const { roomId } = await params;
     const body = await req.json();

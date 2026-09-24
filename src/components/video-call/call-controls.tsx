@@ -2,11 +2,8 @@
 
 import { Info, Mic, MicOff, PhoneOff, Video, VideoOff } from "lucide-react";
 
-import {
-  getLanguageFlag,
-  getLanguageName,
-  type LanguageCode,
-} from "@/lib/languages";
+import { getLanguageFlag, type LanguageCode } from "@/lib/languages";
+import { languageName, type UiLang, uiText } from "@/lib/ui-text";
 
 import { Button } from "@/components/ui/button";
 
@@ -17,7 +14,9 @@ interface CallControlsProps {
   onToggleMute: () => void;
   onToggleVideo: () => void;
   onLeave: () => void;
-  onShowShare: () => void;
+  // Omitted for guests: only the team shares the invite link
+  onShowShare?: () => void;
+  uiLang: UiLang;
 }
 
 export function CallControls({
@@ -28,14 +27,17 @@ export function CallControls({
   onToggleVideo,
   onLeave,
   onShowShare,
+  uiLang,
 }: CallControlsProps) {
+  const t = uiText(uiLang);
+
   return (
     <div className="shrink-0 bg-neutral-800/90 backdrop-blur-sm p-4 border-t border-white/5 relative">
       {/* Language indicator - absolute positioned so it doesn't affect centering */}
       <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/70 text-sm flex items-center gap-2">
         <span>{getLanguageFlag(preferredLanguage)}</span>
         <span className="hidden sm:inline">
-          Hearing in {getLanguageName(preferredLanguage)}
+          {t.hearingIn(languageName(preferredLanguage, uiLang))}
         </span>
       </div>
 
@@ -45,6 +47,8 @@ export function CallControls({
           variant={isMuted ? "destructive" : "secondary"}
           size="icon"
           onClick={onToggleMute}
+          title={isMuted ? t.unmute : t.mute}
+          aria-label={isMuted ? t.unmute : t.mute}
           className="w-12 h-12 rounded-full"
         >
           {isMuted ? (
@@ -58,6 +62,8 @@ export function CallControls({
           variant={isVideoOff ? "destructive" : "secondary"}
           size="icon"
           onClick={onToggleVideo}
+          title={isVideoOff ? t.cameraOn : t.cameraOff}
+          aria-label={isVideoOff ? t.cameraOn : t.cameraOff}
           className="w-12 h-12 rounded-full"
         >
           {isVideoOff ? (
@@ -71,6 +77,8 @@ export function CallControls({
           variant="destructive"
           size="icon"
           onClick={onLeave}
+          title={t.leave}
+          aria-label={t.leave}
           className="w-12 h-12 rounded-full"
         >
           <PhoneOff className="w-5 h-5" />
@@ -78,14 +86,17 @@ export function CallControls({
       </div>
 
       {/* Share info button - absolute positioned on the right */}
-      <button
-        type="button"
-        onClick={onShowShare}
-        className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
-        title="Share meeting link"
-      >
-        <Info className="w-5 h-5" />
-      </button>
+      {onShowShare && (
+        <button
+          type="button"
+          onClick={onShowShare}
+          className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+          title={t.shareLink}
+          aria-label={t.shareLink}
+        >
+          <Info className="w-5 h-5" />
+        </button>
+      )}
     </div>
   );
 }

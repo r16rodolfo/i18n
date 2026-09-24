@@ -10,6 +10,8 @@ import {
 } from "@daily-co/daily-react";
 import { Loader2 } from "lucide-react";
 
+import { uiLangFor, uiText } from "@/lib/ui-text";
+
 import { AgentPanel } from "@/components/agent-panel";
 
 import { CallControls } from "./call-controls";
@@ -28,7 +30,12 @@ export function CallUI({
   username,
   roomId,
   translationProvider,
+  inviteToken,
+  isTeamMember,
+  invitePath,
 }: VideoCallProps) {
+  const uiLang = uiLangFor(spokenLanguage);
+  const t = uiText(uiLang);
   const daily = useDaily();
   const localParticipant = useLocalParticipant();
   const participantIds = useParticipantIds({ filter: "remote" });
@@ -52,13 +59,20 @@ export function CallUI({
     setMuted: setPalabraMuted,
     addRemoteTrack,
     removeRemoteTrack,
-  } = useTranscription({ spokenLanguage, preferredLanguage, username });
+  } = useTranscription({
+    spokenLanguage,
+    preferredLanguage,
+    username,
+    roomId,
+    inviteToken,
+  });
 
-  // Proactive intent detection for email actions
+  // Proactive intent detection for email actions (team only: the agent
+  // routes spend OpenAI credits and can send e-mail)
   const { detectedEmail, dismissEmail } = useIntentDetection({
     roomId,
     transcripts,
-    enabled: !isJoining,
+    enabled: !isJoining && isTeamMember,
   });
 
   // Join call and start transcription
@@ -82,7 +96,7 @@ export function CallUI({
           await startTranscription();
         }
         setIsJoining(false);
-        setShowShareModal(true);
+        if (invitePath) setShowShareModal(true);
       } catch (error) {
         console.error("[Daily] Failed to join:", error);
       }
@@ -101,6 +115,7 @@ export function CallUI({
     daily,
     roomUrl,
     token,
+    invitePath,
     usePalabra,
     startTranscription,
     stopTranscription,
@@ -160,15 +175,15 @@ export function CallUI({
   const leaveCall = useCallback(() => {
     if (!daily) return;
     daily.leave();
-    window.location.href = "/";
-  }, [daily]);
+    window.location.href = isTeamMember ? "/" : "/saiu";
+  }, [daily, isTeamMember]);
 
   if (isJoining) {
     return (
       <div className="min-h-screen bg-neutral-900 flex items-center justify-center">
         <div className="text-center space-y-4">
           <Loader2 className="w-8 h-8 animate-spin text-white mx-auto" />
-          <p className="text-white">Joining call...</p>
+          <p className="text-white">{t.joiningCall}</p>
         </div>
       </div>
     );
@@ -211,14 +226,16 @@ export function CallUI({
         </div>
       </div>
 
-      {/* Floating agent panel */}
-      <AgentPanel
-        preferredLanguage={preferredLanguage}
-        transcripts={transcripts}
-        liveTranscript={liveTranscript}
-        transcriptionStatus={usePalabra ? transcriptionStatus : "stopped"}
-        roomId={roomId}
-      />
+      {/* Floating agent panel (team only) */}
+      {isTeamMember && (
+        <AgentPanel
+          preferredLanguage={preferredLanguage}
+          transcripts={transcripts}
+          liveTranscript={liveTranscript}
+          transcriptionStatus={usePalabra ? transcriptionStatus : "stopped"}
+          roomId={roomId}
+        />
+      )}
 
       {/* Controls */}
       <CallControls
@@ -228,21 +245,27 @@ export function CallUI({
         onToggleMute={toggleMute}
         onToggleVideo={toggleVideo}
         onLeave={leaveCall}
-        onShowShare={() => setShowShareModal(true)}
+        onShowShare={invitePath ? () => setShowShareModal(true) : undefined}
+        uiLang={uiLang}
       />
 
-      {/* Share modal - shows when joining */}
-      {showShareModal && (
-        <ShareModal roomId={roomId} onClose={() => setShowShareModal(false)} />
+      {/* Share modal - shows when a team member joins */}
+      {showShareModal && invitePath && (
+        <ShareModal
+          invitePath={invitePath}
+          onClose={() => setShowShareModal(false)}
+        />
       )}
 
       {/* Email intent confirmation dialog */}
-      <EmailConfirmDialog
-        action={detectedEmail}
-        roomId={roomId}
-        onConfirm={dismissEmail}
-        onDismiss={dismissEmail}
-      />
+      {isTeamMember && (
+        <EmailConfirmDialog
+          action={detectedEmail}
+          roomId={roomId}
+          onConfirm={dismissEmail}
+          onDismiss={dismissEmail}
+        />
+      )}
     </div>
   );
 }

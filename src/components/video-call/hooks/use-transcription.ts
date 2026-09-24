@@ -16,6 +16,8 @@ interface UseTranscriptionOptions {
   spokenLanguage: LanguageCode;
   preferredLanguage: LanguageCode;
   username: string;
+  roomId: string;
+  inviteToken: string | null;
 }
 
 type PalabraClientInstance = {
@@ -34,6 +36,8 @@ export function useTranscription({
   spokenLanguage,
   preferredLanguage,
   username,
+  roomId,
+  inviteToken,
 }: UseTranscriptionOptions) {
   // Remote client: translates remote audio → TTS playback
   const remoteClientRef = useRef<PalabraClientInstance | null>(null);
@@ -44,9 +48,9 @@ export function useTranscription({
   // AudioContext mixer for combining remote audio tracks
   const audioContextRef = useRef<AudioContext | null>(null);
   const mixerDestRef = useRef<MediaStreamAudioDestinationNode | null>(null);
-  const sourceNodesRef = useRef<
-    Map<string, MediaStreamAudioSourceNode>
-  >(new Map());
+  const sourceNodesRef = useRef<Map<string, MediaStreamAudioSourceNode>>(
+    new Map(),
+  );
 
   const [transcripts, setTranscripts] = useState<TranscriptEntry[]>([]);
   const [liveTranscript, setLiveTranscript] = useState<LiveTranscript | null>(
@@ -66,14 +70,11 @@ export function useTranscription({
       audioContextRef.current = audioContext;
       mixerDestRef.current = mixerDest;
 
-      // Fetch Palabra credentials from our API
-      const authRes = await fetch("/api/palabra-auth");
-      if (!authRes.ok) {
-        console.error("[Palabra] Failed to fetch credentials");
-        setTranscriptionStatus("error");
-        return;
-      }
-      const { clientId, clientSecret } = await authRes.json();
+      // The SDK talks to our /api/palabra proxy, which holds the Palabra
+      // secret. This "token" only says which room we are in (and, for guests,
+      // carries the invite so the proxy can check it).
+      const palabraAuth = { userToken: `${roomId}.${inviteToken ?? ""}` };
+      const palabraApiBaseUrl = `${window.location.origin}/api/palabra`;
 
       // Dynamic import (client-side only)
       const { PalabraClient } = await import("@palabra-ai/translator");
@@ -87,7 +88,8 @@ export function useTranscription({
 
       // ─── Remote client: translates others' speech → TTS playback ───
       const remoteClient = new PalabraClient({
-        auth: { clientId, clientSecret },
+        auth: palabraAuth,
+        apiBaseUrl: palabraApiBaseUrl,
         translateFrom: "auto" as Parameters<
           typeof PalabraClient.prototype.setTranslateFrom
         >[0],
@@ -166,7 +168,8 @@ export function useTranscription({
 
       // ─── Local client: transcribes YOUR mic → text only, NO TTS ───
       const localClient = new PalabraClient({
-        auth: { clientId, clientSecret },
+        auth: palabraAuth,
+        apiBaseUrl: palabraApiBaseUrl,
         translateFrom: sourceCode,
         translateTo: targetCode,
         handleOriginalTrack: async () => {
@@ -239,7 +242,7 @@ export function useTranscription({
       console.error("[Palabra] Failed to start:", error);
       setTranscriptionStatus("error");
     }
-  }, [spokenLanguage, preferredLanguage, username]);
+  }, [spokenLanguage, preferredLanguage, username, roomId, inviteToken]);
 
   const stopTranscription = useCallback(async () => {
     // Stop remote client
