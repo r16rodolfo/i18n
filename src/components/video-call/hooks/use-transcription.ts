@@ -235,9 +235,9 @@ export function useTranscription({
         console.error("[Palabra] Failed to start local transcription");
       }
 
-      setTranscriptionStatus(
-        remoteStarted || localStarted ? "active" : "error",
-      );
+      // "active" only when the translated voice is actually playing: the call
+      // UI mutes the original audio in that state and in no other.
+      setTranscriptionStatus(remoteStarted ? "active" : "error");
     } catch (error) {
       console.error("[Palabra] Failed to start:", error);
       setTranscriptionStatus("error");

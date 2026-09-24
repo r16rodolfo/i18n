@@ -34,7 +34,7 @@ Detalhes da arquitetura para quem (ou qual IA) for mexer no código: veja o
 | **Daily.co** | dashboard.daily.co → *Developers* → copie a API key. | `DAILY_API_KEY` |
 | **OpenAI** | platform.openai.com → *API keys* → crie uma chave. | `OPENAI_API_KEY` |
 | Resend *(opcional)* | Sem ela, os e-mails são só simulados. | `RESEND_API_KEY`, `RESEND_FROM_EMAIL` |
-| Palabra *(opcional)* | Só se quiser testar a tradução por voz (escolhida no painel de administração). | `PALABRA_CLIENT_ID`, `PALABRA_CLIENT_SECRET` |
+| Palabra *(opcional)* | Só se quiser testar a tradução por voz (escolhida no painel de administração). | `PALABRA_API_KEY` (chave `plbr_...`) |
 
 ### 3. Configure
 

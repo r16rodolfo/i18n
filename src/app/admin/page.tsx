@@ -31,8 +31,13 @@ const dateFormat = new Intl.DateTimeFormat("pt-BR", {
   timeZone: "America/Sao_Paulo",
 });
 
-export default async function AdminPage() {
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ erro?: string }>;
+}) {
   const admin = await requireAdmin();
+  const { erro } = await searchParams;
 
   const selectedProvider = await getSelectedTranslationProvider();
 
@@ -63,6 +68,17 @@ export default async function AdminPage() {
               continua com o serviço que estava ativo quando entrou.
             </p>
           </div>
+
+          {erro === "chaves-palabra" && (
+            <p
+              role="alert"
+              className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+            >
+              A Palabra recusou a chave configurada na Vercel (PALABRA_API_KEY).
+              Ela não foi ativada: confira a chave no painel da Palabra e tente
+              de novo.
+            </p>
+          )}
 
           <ul className="space-y-2">
             {TRANSLATION_PROVIDERS.map((provider) => {

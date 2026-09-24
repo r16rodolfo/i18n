@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { appSettings } from "@/db/schema";
+import { hasPalabraKeys } from "@/lib/palabra";
 
 // Which service translates the call. Only the server decides this; the
 // browser receives the chosen provider when joining a room.
@@ -48,9 +49,7 @@ export function isConfigured(provider: TranslationProvider): boolean {
     case "none":
       return true;
     case "palabra":
-      return Boolean(
-        process.env.PALABRA_CLIENT_ID && process.env.PALABRA_CLIENT_SECRET,
-      );
+      return hasPalabraKeys();
   }
 }
 

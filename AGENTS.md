@@ -107,7 +107,11 @@ env var, and `none` if the chosen provider has no keys. Currently:
   original audio is not played, only Palabra's TTS. The browser SDK uses
   `apiBaseUrl: "/api/palabra"`: that route proxies session create/delete with
   the Palabra keys, after checking room access (bearer = `{room}.{invite}`).
-  The Palabra secret never reaches the browser.
+  The Palabra secret never reaches the browser. Keys: `PALABRA_API_KEY`
+  (current single key, sent as Bearer) or the legacy `PALABRA_CLIENT_ID` +
+  `PALABRA_CLIENT_SECRET` pair (`src/lib/palabra.ts`). The admin panel checks
+  the keys with a real session before enabling Palabra, and the call UI only
+  mutes the original voice while Palabra's voice is actually playing.
 
 **Palabra is a permanent option; never remove it.** The owner wants to
 choose among several providers in the admin panel. To add a provider:
