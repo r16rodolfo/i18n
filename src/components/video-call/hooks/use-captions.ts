@@ -8,12 +8,14 @@ import { nanoid } from "nanoid";
 
 import { isValidLanguageCode, type LanguageCode } from "@/lib/languages";
 
+import { findCut, splitWords } from "../caption-pieces";
 import type { LiveTranscript, TranscriptEntry } from "../types";
 
 // Shares what each person says with everyone in the call, translated, like
-// TV subtitles: speech arrives in short finished pieces (2 to 4.5 seconds,
-// see use-scribe) and each piece is shown once it is translated, without
-// being rewritten afterwards. The last two pieces stay on screen.
+// TV subtitles: while you talk, your words are cut into short pieces at
+// punctuation, between whole words (caption-pieces.ts), and each piece is
+// shown once it is translated, without being rewritten afterwards. The last
+// two pieces stay on screen.
 //
 // Each browser transcribes only its own mic. For every finished piece the
 // speaker's browser:
@@ -183,19 +185,12 @@ export function useCaptions({
     [daily],
   );
 
-  // What you are saying right now (changes as you speak)
-  const publishPartial = useCallback(
-    (text: string) => {
-      const caption = captionFor(getMyId(), myName);
-      setCaption({ ...caption, talking: true, partialText: text });
-      send({ type: "partial", name: myName, text, lang: spokenLanguage });
-    },
-    [captionFor, getMyId, myName, setCaption, send, spokenLanguage],
-  );
+  // Words of the current phrase already sent out as pieces
+  const sentWordsRef = useRef(0);
 
   // A finished piece of your speech: show and share it, then get and share
   // its translations
-  const publishFinal = useCallback(
+  const emitPiece = useCallback(
     async (text: string) => {
       const id = nanoid(12);
       // Before this piece is added to the list
@@ -264,6 +259,51 @@ export function useCaptions({
       inviteToken,
       visitorId,
     ],
+  );
+
+  // What you are saying right now (changes as you speak). Settled parts of
+  // a long phrase go out as pieces without waiting for you to pause.
+  const publishPartial = useCallback(
+    (text: string) => {
+      let unsent = splitWords(text).slice(sentWordsRef.current);
+      const cut = findCut(unsent);
+      if (cut > 0) {
+        emitPiece(unsent.slice(0, cut).join(" "));
+        sentWordsRef.current += cut;
+        unsent = unsent.slice(cut);
+      }
+
+      const rest = unsent.join(" ");
+      const caption = captionFor(getMyId(), myName);
+      setCaption({ ...caption, talking: true, partialText: rest || undefined });
+      if (rest) {
+        send({
+          type: "partial",
+          name: myName,
+          text: rest,
+          lang: spokenLanguage,
+        });
+      }
+    },
+    [emitPiece, captionFor, getMyId, myName, setCaption, send, spokenLanguage],
+  );
+
+  // The phrase is over (you paused or clicked "Terminei"): what wasn't sent
+  // yet becomes the last piece
+  const publishFinal = useCallback(
+    (text: string) => {
+      const rest = splitWords(text).slice(sentWordsRef.current).join(" ");
+      sentWordsRef.current = 0;
+      if (rest) {
+        emitPiece(rest);
+        return;
+      }
+      const current = liveRef.current;
+      if (current?.speakerId === getMyId()) {
+        setCaption({ ...current, talking: false, partialText: undefined });
+      }
+    },
+    [emitPiece, getMyId, setCaption],
   );
 
   useDailyEvent(

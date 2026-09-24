@@ -140,9 +140,11 @@ env var, and `none` if the chosen provider has no keys. Currently:
     TV subtitles: the last two finished pieces, each shown once translated
     and never rewritten. Listeners only ever see text in their own
     language (a "translating" hint meanwhile).
-  - Pieces: `use-scribe.ts` cuts speech into 1.8–4.5 s pieces (manual commit
-    at the first 150 ms gap between words after 1.8 s, forced at 4.5 s), so
-    translations flow while the person keeps talking.
+  - Pieces: `caption-pieces.ts` cuts the live transcript **text** (never
+    the audio, so no word is cut in half): right after punctuation Scribe
+    added, once 2 more words followed; without punctuation, every ~14 words,
+    never ending on a linking word. What's left goes out when Scribe ends
+    the phrase (0.6 s pause) or on "Terminei".
   - Planned next: translated voice (ElevenLabs TTS, per-speaker
     female/male voice), glossary in `/admin`, agent reading `transcripts`.
   - Local testing: the local app shares the production DB, so don't pick
