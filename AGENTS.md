@@ -148,8 +148,19 @@ env var, and `none` if the chosen provider has no keys. Currently:
   - Planned next: translated voice (ElevenLabs TTS, per-speaker
     female/male voice), glossary in `/admin`, agent reading `transcripts`.
   - Local testing: the local app shares the production DB, so don't pick
-    ElevenLabs in the local `/admin`; set `DEV_TRANSLATION_PROVIDER` in
-    `.env.local` instead (ignored outside `bun dev`).
+    ElevenLabs/Soniox in the local `/admin`; set `DEV_TRANSLATION_PROVIDER`
+    in `.env.local` instead (ignored outside `bun dev`).
+- `soniox`: same UI and flow as `elevenlabs` (floor control, captions,
+  transcript panel, `transcripts`), but `use-soniox.ts` sends each person's
+  own mic to Soniox (`stt-rt-v5`, WebSocket straight from the browser,
+  temporary single-use key from `POST /api/soniox/token`), which transcribes
+  AND translates (one_way into the language most listeners read, from
+  `useCaptions().getTargetLanguage()`). Soniox returns finished pieces with
+  their translation; they are broadcast in the `final` message and the
+  captions route only saves them (no OpenAI). Measured ~2–4 s sooner than
+  ElevenLabs + OpenAI. Key: `SONIOX_API_KEY` (`src/lib/soniox.ts`, needs
+  "Speech-to-text, real-time" + "Temporary API keys", prepaid balance).
+  Mic capture shared with ElevenLabs in `hooks/mic-tap.ts`.
 
 **Palabra is a permanent option; never remove it.** The owner wants to
 choose among several providers in the admin panel. To add a provider:

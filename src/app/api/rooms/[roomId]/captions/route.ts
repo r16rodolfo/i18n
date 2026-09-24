@@ -8,11 +8,14 @@ import { isValidLanguageCode, type LanguageCode } from "@/lib/languages";
 import { getRoomAccess } from "@/lib/room-access";
 import { getActiveTranslationProvider } from "@/lib/translation-providers";
 
-// A piece of speech from the speaker's browser (ElevenLabs provider):
-// translate it into the languages the others want to hear and send the
-// translations back; the speaker then shares them with everyone through
-// Daily. The piece is saved in the meeting transcript after answering, so
-// the database never slows the captions down.
+// A piece of speech from the speaker's browser, saved in the meeting
+// transcript (after answering, so the database never slows captions down).
+//
+// - ElevenLabs provider: the piece is translated here (OpenAI) into the
+//   languages the others want; the speaker then shares the translations
+//   through Daily.
+// - Soniox provider: Soniox already translated it in the browser; the
+//   translations come in the request and are only saved.
 
 const languageCode = z.string().refine(isValidLanguageCode);
 
@@ -28,6 +31,11 @@ const CaptionSchema = z.object({
   context: z.array(z.string().max(500)).max(6).default([]),
   speakerName: z.string().trim().min(1).max(60),
   visitorId: z.string().min(1).max(100),
+  // Soniox: translations made in the browser, by language
+  translations: z
+    .record(languageCode, z.string().max(2000))
+    .refine((value) => Object.keys(value).length <= 5)
+    .optional(),
 });
 
 export async function POST(
@@ -41,13 +49,13 @@ export async function POST(
   }
   const caption = parsed.data;
 
-  // Translation spends OpenAI credits: only while ElevenLabs is the provider,
-  // and only for people who may use the room
+  // Only while captions are on, and only for people who may use the room
+  // (ElevenLabs translation spends OpenAI credits)
   const [provider, access] = await Promise.all([
     getActiveTranslationProvider(),
     getRoomAccess(roomId, caption.invite),
   ]);
-  if (provider !== "elevenlabs") {
+  if (provider !== "elevenlabs" && provider !== "soniox") {
     return Response.json({ error: "Legendas desativadas" }, { status: 409 });
   }
   if (!access) {
@@ -63,6 +71,10 @@ export async function POST(
   // One failed language must not lose the others (or the original)
   const results = await Promise.all(
     targets.map(async (to) => {
+      if (provider === "soniox") {
+        const text = caption.translations?.[to]?.trim();
+        return text ? ([to, text] as const) : null;
+      }
       try {
         const text = await translateCaption({
           text: caption.text,

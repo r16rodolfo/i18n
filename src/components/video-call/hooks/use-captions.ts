@@ -54,6 +54,8 @@ type CaptionMessage =
       name: string;
       text: string;
       lang: string;
+      // Soniox: already translated, no separate "translation" message
+      translations?: Record<string, string>;
     }
   | {
       kind: typeof MESSAGE_KIND;
@@ -189,10 +191,12 @@ export function useCaptions({
   const sentWordsRef = useRef(0);
 
   // A finished piece of your speech: show and share it, then get and share
-  // its translations
+  // its translations. Soniox hands them over ready (`ready`): they go out
+  // with the piece and the server only saves them.
   const emitPiece = useCallback(
-    async (text: string) => {
+    async (text: string, ready?: Record<string, string>) => {
       const id = nanoid(12);
+      const hasReady = Boolean(ready && Object.keys(ready).length > 0);
       // Before this piece is added to the list
       const context = recentRef.current;
       const caption = captionFor(getMyId(), myName);
@@ -211,7 +215,14 @@ export function useCaptions({
         translated: text,
         timestamp: new Date(),
       });
-      send({ type: "final", id, name: myName, text, lang: spokenLanguage });
+      send({
+        type: "final",
+        id,
+        name: myName,
+        text,
+        lang: spokenLanguage,
+        ...(hasReady ? { translations: ready } : {}),
+      });
 
       // Saved in the transcript even when nobody needs a translation
       const targets = [...new Set(languagesRef.current.values())];
@@ -230,9 +241,11 @@ export function useCaptions({
               context,
               speakerName: myName,
               visitorId,
+              ...(ready ? { translations: ready } : {}),
             }),
           },
         );
+        if (ready) return;
         if (!res.ok) {
           console.error("[Captions] translation request failed:", res.status);
           return;
@@ -306,6 +319,38 @@ export function useCaptions({
     [emitPiece, getMyId, setCaption],
   );
 
+  // Soniox: what you are saying right now (Soniox decides the pieces)
+  const showPartial = useCallback(
+    (text: string) => {
+      const caption = captionFor(getMyId(), myName);
+      setCaption({ ...caption, talking: true, partialText: text });
+      send({ type: "partial", name: myName, text, lang: spokenLanguage });
+    },
+    [captionFor, getMyId, myName, setCaption, send, spokenLanguage],
+  );
+
+  // Soniox: a finished piece, already translated
+  const publishTranslatedPiece = useCallback(
+    (original: string, translations: Record<string, string>) => {
+      emitPiece(original, translations);
+    },
+    [emitPiece],
+  );
+
+  // The language most of the others read, if it isn't the one you speak
+  const getTargetLanguage = useCallback((): LanguageCode | null => {
+    const counts = new Map<LanguageCode, number>();
+    for (const lang of languagesRef.current.values()) {
+      if (lang !== spokenLanguage)
+        counts.set(lang, (counts.get(lang) ?? 0) + 1);
+    }
+    let best: LanguageCode | null = null;
+    for (const [lang, count] of counts) {
+      if (!best || count > (counts.get(best) ?? 0)) best = lang;
+    }
+    return best;
+  }, [spokenLanguage]);
+
   useDailyEvent(
     "app-message",
     useCallback(
@@ -342,14 +387,20 @@ export function useCaptions({
             const id = clean(message.id, 32);
             if (!text || !id) return;
             const name = clean(message.name, 60);
+            // Soniox pieces arrive already translated
+            const ready = clean(
+              message.translations?.[preferredLanguage],
+              MAX_TEXT,
+            );
             const needsTranslation =
-              clean(message.lang, 8) !== preferredLanguage;
+              !ready && clean(message.lang, 8) !== preferredLanguage;
+            const shown = ready || text;
             const caption = captionFor(from, name);
             setCaption({
               ...caption,
               lines: [
                 ...caption.lines,
-                { id, text, translating: needsTranslation },
+                { id, text: shown, translating: needsTranslation },
               ].slice(-MAX_LINES),
               talking: false,
               partialText: undefined,
@@ -358,7 +409,7 @@ export function useCaptions({
               id,
               speaker: name,
               original: text,
-              translated: text,
+              translated: shown,
               timestamp: new Date(),
               pending: needsTranslation,
             });
@@ -419,7 +470,15 @@ export function useCaptions({
     };
   }, []);
 
-  return { live, entries, publishPartial, publishFinal };
+  return {
+    live,
+    entries,
+    publishPartial,
+    publishFinal,
+    showPartial,
+    publishTranslatedPiece,
+    getTargetLanguage,
+  };
 }
 
 // What the transcript panel shows as "speaking now" (empty text when they

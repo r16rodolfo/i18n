@@ -10,6 +10,7 @@ import { appSettings, teamMembers } from "@/db/schema";
 import { getTeamMember } from "@/lib/auth";
 import { verifyElevenLabsKey } from "@/lib/elevenlabs";
 import { verifyPalabraKeys } from "@/lib/palabra";
+import { verifySonioxKey } from "@/lib/soniox";
 import {
   isConfigured,
   isTranslationProvider,
@@ -41,6 +42,9 @@ export async function setTranslationProvider(formData: FormData) {
   }
   if (provider === "elevenlabs" && !(await verifyElevenLabsKey())) {
     redirect("/admin?erro=chave-elevenlabs");
+  }
+  if (provider === "soniox" && !(await verifySonioxKey())) {
+    redirect("/admin?erro=chave-soniox");
   }
 
   await db

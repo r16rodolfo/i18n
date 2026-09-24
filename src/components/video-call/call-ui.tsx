@@ -21,6 +21,7 @@ import { liveTranscriptOf, useCaptions } from "./hooks/use-captions";
 import { useFloor } from "./hooks/use-floor";
 import { useIntentDetection } from "./hooks/use-intent-detection";
 import { useScribe } from "./hooks/use-scribe";
+import { useSoniox } from "./hooks/use-soniox";
 import { useTranscription } from "./hooks/use-transcription";
 import { ParticipantTile } from "./participant-tile";
 import { ShareModal } from "./share-modal";
@@ -77,8 +78,11 @@ export function CallUI({
   // With Palabra, others are heard only through the translated voice.
   // Otherwise the original audio of each participant is played.
   const usePalabra = translationProvider === "palabra";
-  // With ElevenLabs, each person's mic is transcribed and shared as captions
+  // With ElevenLabs or Soniox, each person's mic is transcribed, translated
+  // and shared as captions; everyone hears the original voice
   const useElevenLabs = translationProvider === "elevenlabs";
+  const useSonioxEngine = translationProvider === "soniox";
+  const liveCaptions = useElevenLabs || useSonioxEngine;
 
   const {
     transcripts,
@@ -104,11 +108,11 @@ export function CallUI({
   const translatedVoiceActive = usePalabra && transcriptionStatus === "active";
   const originalVolume = translatedVoiceActive ? 0.15 : 1;
 
-  // ElevenLabs: captions shared through Daily, floor control, your mic
+  // Captions shared through Daily, floor control, your mic
   const inCall = !isJoining;
   const captions = useCaptions({
     daily,
-    ready: inCall && useElevenLabs,
+    ready: inCall && liveCaptions,
     myName: username,
     spokenLanguage,
     preferredLanguage,
@@ -118,9 +122,9 @@ export function CallUI({
   });
   const floor = useFloor({
     daily,
-    enabledByDefault: useElevenLabs,
+    enabledByDefault: liveCaptions,
     myName: username,
-    ready: inCall && useElevenLabs,
+    ready: inCall && liveCaptions,
   });
   const scribe = useScribe({
     enabled: useElevenLabs,
@@ -130,22 +134,33 @@ export function CallUI({
     onPartial: captions.publishPartial,
     onCommitted: captions.publishFinal,
   });
-  const floorActive = useElevenLabs && floor.floorMode;
+  const soniox = useSoniox({
+    enabled: useSonioxEngine,
+    roomId,
+    inviteToken,
+    language: spokenLanguage,
+    getTargetLanguage: captions.getTargetLanguage,
+    onPartial: captions.showPartial,
+    onPiece: captions.publishTranslatedPiece,
+  });
+  // The engine that listens to your mic in this meeting
+  const engine = useSonioxEngine ? soniox : scribe;
+  const floorActive = liveCaptions && floor.floorMode;
   // The transcript panel: everyone in ElevenLabs meetings (in their own
   // language); the AI agent inside it stays team-only
-  const showTranscriptPanel = isTeamMember || useElevenLabs;
+  const showTranscriptPanel = isTeamMember || liveCaptions;
   // Is your mic open? With the floor control on, only while you have the
   // floor; otherwise it follows the mute button.
   const micOpen = floorActive ? floor.iHold : !isMuted;
 
   // What the agent panel and the e-mail detection read
-  const callTranscripts = useElevenLabs ? captions.entries : transcripts;
+  const callTranscripts = liveCaptions ? captions.entries : transcripts;
   // Only the phrase still being spoken: finished ones are already in the list
-  const callLiveTranscript = useElevenLabs
+  const callLiveTranscript = liveCaptions
     ? liveTranscriptOf(captions.live)
     : liveTranscript;
-  const callTranscriptionStatus = useElevenLabs
-    ? scribe.status === "error"
+  const callTranscriptionStatus = liveCaptions
+    ? engine.status === "error"
       ? "error"
       : "active"
     : usePalabra
@@ -242,18 +257,18 @@ export function CallUI({
   });
 
   // Open/close your mic in the call, and the ElevenLabs transcription with it
-  const { start: startScribe, stop: stopScribe } = scribe;
+  const { start: startEngine, stop: stopEngine } = engine;
   useEffect(() => {
     if (!daily || isJoining) return;
     daily.setLocalAudio(micOpen);
-    if (!useElevenLabs) return;
-    if (micOpen) startScribe();
-    else stopScribe();
-  }, [daily, isJoining, micOpen, useElevenLabs, startScribe, stopScribe]);
+    if (!liveCaptions) return;
+    if (micOpen) startEngine();
+    else stopEngine();
+  }, [daily, isJoining, micOpen, liveCaptions, startEngine, stopEngine]);
 
   // Give the floor back after a long silence, so nobody stays locked out
   const { iHold, release: releaseFloor } = floor;
-  const { getSilenceMs } = scribe;
+  const { getSilenceMs } = engine;
   useEffect(() => {
     if (!floorActive || !iHold) return;
     const timer = setInterval(() => {
@@ -334,7 +349,7 @@ export function CallUI({
           ))}
         </div>
 
-        {useElevenLabs && (
+        {liveCaptions && (
           <CaptionsBar
             caption={showCaptions ? captions.live : null}
             floorStatus={
@@ -347,7 +362,7 @@ export function CallUI({
                   }
                 : null
             }
-            hasError={scribe.status === "error"}
+            hasError={engine.status === "error"}
             raised={showTranscriptPanel}
             uiLang={uiLang}
           />
@@ -389,12 +404,12 @@ export function CallUI({
             : undefined
         }
         captionsToggle={
-          useElevenLabs
+          liveCaptions
             ? { enabled: showCaptions, onToggle: toggleCaptions }
             : undefined
         }
         floorToggle={
-          useElevenLabs && isTeamMember
+          liveCaptions && isTeamMember
             ? {
                 enabled: floor.floorMode,
                 onToggle: () => floor.setFloorMode(!floor.floorMode),

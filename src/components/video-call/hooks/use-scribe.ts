@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { LanguageCode } from "@/lib/languages";
 
+import { isVoice, type MicTap, openMicTap, toPcm16 } from "./mic-tap";
+
 // Transcribes YOUR microphone with ElevenLabs Scribe Realtime.
 //
 // The browser connects straight to ElevenLabs with a single-use token from
@@ -16,27 +18,11 @@ import type { LanguageCode } from "@/lib/languages";
 // is ever cut in half.
 
 const SCRIBE_URL = "wss://api.elevenlabs.io/v1/speech-to-text/realtime";
-// Formats Scribe accepts; the mic is sent at the AudioContext's own rate
-const SUPPORTED_RATES = [8000, 16000, 22050, 24000, 44100, 48000];
 const CHUNK_MS = 100;
-// Microphone level (RMS) above which we count it as someone speaking
-const VOICE_LEVEL = 0.02;
 // Tokens are valid for 15 min; keep a fresh one ready to connect instantly
 const TOKEN_MAX_AGE_MS = 12 * 60 * 1000;
 // After stop(): how long to wait for the last phrase before closing
 const FINAL_PHRASE_TIMEOUT_MS = 3000;
-
-// Collects raw mic samples and hands them to the page in small batches
-const WORKLET_SOURCE = `
-class MicTap extends AudioWorkletProcessor {
-  process(inputs) {
-    const channel = inputs[0] && inputs[0][0];
-    if (channel) this.port.postMessage(channel.slice(0));
-    return true;
-  }
-}
-registerProcessor("mic-tap", MicTap);
-`;
 
 export type ScribeStatus = "idle" | "connecting" | "listening" | "error";
 
@@ -50,12 +36,7 @@ interface UseScribeOptions {
 }
 
 function toBase64(samples: Float32Array): string {
-  const pcm = new Int16Array(samples.length);
-  for (let i = 0; i < samples.length; i++) {
-    const s = Math.max(-1, Math.min(1, samples[i]));
-    pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
-  }
-  const bytes = new Uint8Array(pcm.buffer);
+  const bytes = new Uint8Array(toPcm16(samples).buffer);
   let binary = "";
   for (let i = 0; i < bytes.length; i += 0x8000) {
     binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
@@ -79,11 +60,7 @@ export function useScribe({
   onPartialRef.current = onPartial;
   onCommittedRef.current = onCommitted;
 
-  const micRef = useRef<{
-    stream: MediaStream;
-    context: AudioContext;
-    node: AudioWorkletNode;
-  } | null>(null);
+  const micRef = useRef<MicTap | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const tokenRef = useRef<{ token: string; at: number } | null>(null);
 
@@ -132,8 +109,8 @@ export function useScribe({
 
   const sendAudio = useCallback((audioBase64: string, commit: boolean) => {
     const ws = wsRef.current;
-    const context = micRef.current?.context;
-    if (!ws || ws.readyState !== WebSocket.OPEN || !context) {
+    const mic = micRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN || !mic) {
       if (audioBase64) pendingRef.current.push(audioBase64);
       return;
     }
@@ -142,7 +119,7 @@ export function useScribe({
         message_type: "input_audio_chunk",
         audio_base_64: audioBase64,
         commit,
-        sample_rate: context.sampleRate,
+        sample_rate: mic.sampleRate,
       }),
     );
   }, []);
@@ -168,49 +145,18 @@ export function useScribe({
   const openMic = useCallback(async () => {
     if (micRef.current) return micRef.current;
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      },
-    });
-    let context = new AudioContext();
-    if (!SUPPORTED_RATES.includes(context.sampleRate)) {
-      await context.close();
-      context = new AudioContext({ sampleRate: 48000 });
-    }
-    if (context.state === "suspended") {
-      await context.resume().catch(() => {});
-    }
-
-    const moduleUrl = URL.createObjectURL(
-      new Blob([WORKLET_SOURCE], { type: "application/javascript" }),
-    );
-    await context.audioWorklet.addModule(moduleUrl);
-    URL.revokeObjectURL(moduleUrl);
-
-    const node = new AudioWorkletNode(context, "mic-tap");
-    const samplesPerChunk = Math.round((context.sampleRate * CHUNK_MS) / 1000);
-
-    node.port.onmessage = (event: MessageEvent<Float32Array>) => {
+    let samplesPerChunk = 0;
+    const mic = await openMicTap((samples) => {
       if (!sendingRef.current) return;
-      const samples = event.data;
-
-      let sum = 0;
-      for (let i = 0; i < samples.length; i++) sum += samples[i] * samples[i];
-      if (Math.sqrt(sum / samples.length) > VOICE_LEVEL) {
-        lastVoiceAtRef.current = Date.now();
-      }
+      if (isVoice(samples)) lastVoiceAtRef.current = Date.now();
 
       batchRef.current.push(samples);
       batchLengthRef.current += samples.length;
       if (batchLengthRef.current >= samplesPerChunk) flushBatch(false);
-    };
-
-    context.createMediaStreamSource(stream).connect(node);
-    micRef.current = { stream, context, node };
-    return micRef.current;
+    });
+    samplesPerChunk = Math.round((mic.sampleRate * CHUNK_MS) / 1000);
+    micRef.current = mic;
+    return mic;
   }, [flushBatch]);
 
   const closeSocket = useCallback(() => {
@@ -231,14 +177,14 @@ export function useScribe({
       setStatus("error");
       return;
     }
-    const context = micRef.current?.context;
-    if (!context) return;
+    const mic = micRef.current;
+    if (!mic) return;
 
     const params = new URLSearchParams({
       model_id: "scribe_v2_realtime",
       token,
       language_code: language,
-      audio_format: `pcm_${context.sampleRate}`,
+      audio_format: `pcm_${mic.sampleRate}`,
       commit_strategy: "vad",
       vad_silence_threshold_secs: "0.6",
     });
@@ -353,13 +299,8 @@ export function useScribe({
     return () => {
       sendingRef.current = false;
       closeSocket();
-      const mic = micRef.current;
+      micRef.current?.close();
       micRef.current = null;
-      if (mic) {
-        mic.node.port.onmessage = null;
-        for (const track of mic.stream.getTracks()) track.stop();
-        mic.context.close().catch(() => {});
-      }
     };
   }, [closeSocket]);
 

@@ -80,6 +80,18 @@ export default async function AdminPage({
             </p>
           )}
 
+          {erro === "chave-soniox" && (
+            <p
+              role="alert"
+              className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+            >
+              A Soniox recusou a chave configurada na Vercel (SONIOX_API_KEY).
+              Ela não foi ativada: confira no painel da Soniox se a chave tem as
+              permissões &quot;Speech-to-text, real-time&quot; e &quot;Temporary
+              API keys&quot; e se a conta tem saldo.
+            </p>
+          )}
+
           {erro === "chave-elevenlabs" && (
             <p
               role="alert"
