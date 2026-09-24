@@ -1,3 +1,4 @@
+import { PALABRA_API, palabraHeaders } from "@/lib/palabra";
 import { getRoomAccess } from "@/lib/room-access";
 import { getActiveTranslationProvider } from "@/lib/translation-providers";
 
@@ -9,8 +10,6 @@ import { getActiveTranslationProvider } from "@/lib/translation-providers";
 // Only the two calls the SDK makes are forwarded:
 //   POST   /session-storage/session        → create a streaming session
 //   DELETE /session-storage/sessions/:id   → end it
-
-const PALABRA_API = "https://api.palabra.ai";
 
 type Params = { params: Promise<{ path: string[] }> };
 
@@ -26,14 +25,6 @@ async function authorize(req: Request): Promise<boolean> {
   if (!roomName) return false;
 
   return Boolean(await getRoomAccess(roomName, inviteToken));
-}
-
-function palabraHeaders() {
-  return {
-    ClientId: process.env.PALABRA_CLIENT_ID ?? "",
-    ClientSecret: process.env.PALABRA_CLIENT_SECRET ?? "",
-    "Content-Type": "application/json",
-  };
 }
 
 const notFound = () => Response.json({ error: "Not found" }, { status: 404 });

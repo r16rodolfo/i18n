@@ -2,11 +2,13 @@
 
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { db } from "@/db";
 import { appSettings, teamMembers } from "@/db/schema";
 import { getTeamMember } from "@/lib/auth";
+import { verifyPalabraKeys } from "@/lib/palabra";
 import {
   isConfigured,
   isTranslationProvider,
@@ -31,6 +33,11 @@ export async function setTranslationProvider(formData: FormData) {
   if (!isConfigured(provider)) {
     throw new Error("As chaves deste provedor não estão configuradas");
   }
+  // Keys present is not enough: make sure the service accepts them, or
+  // every call would go silent (the original voice is replaced).
+  if (provider === "palabra" && !(await verifyPalabraKeys())) {
+    redirect("/admin?erro=chaves-palabra");
+  }
 
   await db
     .insert(appSettings)
@@ -45,6 +52,7 @@ export async function setTranslationProvider(formData: FormData) {
     });
 
   revalidatePath("/admin");
+  redirect("/admin");
 }
 
 const MemberChangeSchema = z.object({
