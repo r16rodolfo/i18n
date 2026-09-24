@@ -1,5 +1,6 @@
 import { relations } from "drizzle-orm";
 import {
+  index,
   jsonb,
   pgTable,
   text,
@@ -22,34 +23,47 @@ export const rooms = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
     expiresAt: timestamp("expires_at"),
   },
-  (table) => [unique("rooms_daily_room_name_unique").on(table.dailyRoomName)]
+  (table) => [unique("rooms_daily_room_name_unique").on(table.dailyRoomName)],
 ).enableRLS();
 
-export const participants = pgTable("participants", {
-  id: text("id").primaryKey(), // visitorId + roomId
-  visitorId: text("visitor_id").notNull(),
-  roomId: uuid("room_id")
-    .notNull()
-    .references(() => rooms.id, { onDelete: "cascade" }),
-  username: text("username").notNull(),
-  preferredLanguage: text("preferred_language").notNull().default("en"),
-  email: text("email"),
-  joinedAt: timestamp("joined_at").defaultNow().notNull(),
-  leftAt: timestamp("left_at"),
-}).enableRLS();
+export const participants = pgTable(
+  "participants",
+  {
+    id: text("id").primaryKey(), // visitorId + roomId
+    visitorId: text("visitor_id").notNull(),
+    roomId: uuid("room_id")
+      .notNull()
+      .references(() => rooms.id, { onDelete: "cascade" }),
+    username: text("username").notNull(),
+    preferredLanguage: text("preferred_language").notNull().default("en"),
+    email: text("email"),
+    joinedAt: timestamp("joined_at").defaultNow().notNull(),
+    leftAt: timestamp("left_at"),
+  },
+  (table) => [index("participants_room_id_idx").on(table.roomId)],
+).enableRLS();
 
-export const transcripts = pgTable("transcripts", {
-  id: text("id").primaryKey(), // nanoid(12)
-  roomId: uuid("room_id")
-    .notNull()
-    .references(() => rooms.id, { onDelete: "cascade" }),
-  participantId: text("participant_id").notNull(),
-  speakerName: text("speaker_name"),
-  originalText: text("original_text").notNull(),
-  originalLanguage: text("original_language").notNull(),
-  translatedTexts: jsonb("translated_texts").$type<Record<string, string>>(),
-  timestamp: timestamp("timestamp").defaultNow().notNull(),
-}).enableRLS();
+export const transcripts = pgTable(
+  "transcripts",
+  {
+    id: text("id").primaryKey(), // nanoid(12)
+    roomId: uuid("room_id")
+      .notNull()
+      .references(() => rooms.id, { onDelete: "cascade" }),
+    participantId: text("participant_id").notNull(),
+    speakerName: text("speaker_name"),
+    originalText: text("original_text").notNull(),
+    originalLanguage: text("original_language").notNull(),
+    translatedTexts: jsonb("translated_texts").$type<Record<string, string>>(),
+    timestamp: timestamp("timestamp").defaultNow().notNull(),
+  },
+  (table) => [
+    index("transcripts_room_id_timestamp_idx").on(
+      table.roomId,
+      table.timestamp,
+    ),
+  ],
+).enableRLS();
 
 // Relations
 export const roomsRelations = relations(rooms, ({ many }) => ({

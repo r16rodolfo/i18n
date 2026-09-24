@@ -1,0 +1,2 @@
+CREATE INDEX "participants_room_id_idx" ON "participants" USING btree ("room_id");--> statement-breakpoint
+CREATE INDEX "transcripts_room_id_timestamp_idx" ON "transcripts" USING btree ("room_id","timestamp");
