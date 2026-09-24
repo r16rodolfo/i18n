@@ -116,7 +116,12 @@ export function CallUI({
 
   // What the agent panel and the e-mail detection read
   const callTranscripts = useElevenLabs ? captions.entries : transcripts;
-  const callLiveTranscript = useElevenLabs ? captions.live : liveTranscript;
+  // Only the phrase still being spoken: finished ones are already in the list
+  const callLiveTranscript = useElevenLabs
+    ? captions.live && !captions.live.final
+      ? captions.live
+      : null
+    : liveTranscript;
   const callTranscriptionStatus = useElevenLabs
     ? scribe.status === "error"
       ? "error"
