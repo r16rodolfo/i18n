@@ -74,22 +74,24 @@ export function CaptionsBar({
           <p className="text-xs font-medium uppercase tracking-wide text-white/50">
             {caption.speaker}
           </p>
-          <p
-            className={cn(
-              "text-lg leading-snug",
-              caption.final && !caption.translating
-                ? "text-white"
-                : "text-white/70 italic",
-            )}
-          >
-            {caption.text}
-          </p>
-          {caption.translating && (
-            <p className="mt-1 text-xs text-white/50">{t.translating}</p>
-          )}
-          {caption.original && caption.original !== caption.text && (
-            <p className="mt-1 text-sm leading-snug text-white/50">
-              {caption.original}
+          {caption.translating ? (
+            // Only text in your own language is shown
+            <p className="flex items-center justify-center gap-2 text-lg leading-snug text-white/60 italic">
+              <span className="flex gap-1" aria-hidden>
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-white/60 [animation-delay:-0.3s]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-white/60 [animation-delay:-0.15s]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-white/60" />
+              </span>
+              {t.translating}
+            </p>
+          ) : (
+            <p
+              className={cn(
+                "text-lg leading-snug",
+                caption.final ? "text-white" : "text-white/70 italic",
+              )}
+            >
+              {caption.text}
             </p>
           )}
         </div>

@@ -14,21 +14,31 @@ import type { LiveTranscript, TranscriptEntry } from "../types";
 //
 // Each browser transcribes only its own mic. When a phrase is finished, the
 // speaker's browser:
-//   1. broadcasts the original text (Daily app message), so it shows at once
+//   1. broadcasts the original text (Daily app message)
 //   2. asks the server to translate it into the languages the others want
 //      (the server also saves it in the meeting transcript)
-//   3. broadcasts the translations; each person shows their own language
-// Everyone announces the language they want to hear when they join.
+//   3. broadcasts the translations
+// Everyone announces the language they want to hear when they join. Each
+// person only ever sees text in their own language: while a phrase in
+// another language is spoken or translated, a "translating" hint shows.
 
 const MESSAGE_KIND = "r16-caption";
 const MAX_TEXT = 2000;
 const MAX_ENTRIES = 100;
 // How long a finished phrase stays on screen
 const CAPTION_HOLD_MS = 6000;
+// If the translation doesn't come by then, show the original words
+const TRANSLATION_TIMEOUT_MS = 5000;
 
 type CaptionMessage =
   | { kind: typeof MESSAGE_KIND; type: "lang"; lang: string; ask?: boolean }
-  | { kind: typeof MESSAGE_KIND; type: "partial"; name: string; text: string }
+  | {
+      kind: typeof MESSAGE_KIND;
+      type: "partial";
+      name: string;
+      text: string;
+      lang: string;
+    }
   | {
       kind: typeof MESSAGE_KIND;
       type: "final";
@@ -64,9 +74,8 @@ export interface LiveCaption extends LiveTranscript {
   id?: string;
   // false while the phrase is still being spoken
   final: boolean;
-  // Original words, when `text` is a translation of them
-  original?: string;
-  // Waiting for the translation into your language
+  // Spoken in another language and not translated yet: `text` holds the
+  // original words, which are not shown (only a "translating" hint)
   translating?: boolean;
 }
 
@@ -97,6 +106,7 @@ export function useCaptions({
   const [entries, setEntries] = useState<TranscriptEntry[]>([]);
   const liveRef = useRef<LiveCaption | null>(null);
   const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Language each other participant wants to hear, by Daily session id
   const languagesRef = useRef<Map<string, LanguageCode>>(new Map());
 
@@ -142,12 +152,7 @@ export function useCaptions({
       );
       const current = liveRef.current;
       if (current?.id === id) {
-        show({
-          ...current,
-          text,
-          original: current.original ?? current.text,
-          translating: false,
-        });
+        show({ ...current, text, translating: false });
       }
     },
     [preferredLanguage, show],
@@ -157,9 +162,9 @@ export function useCaptions({
   const publishPartial = useCallback(
     (text: string) => {
       show({ speakerId: getMyId(), speaker: myName, text, final: false });
-      send({ type: "partial", name: myName, text });
+      send({ type: "partial", name: myName, text, lang: spokenLanguage });
     },
-    [getMyId, myName, show, send],
+    [getMyId, myName, show, send, spokenLanguage],
   );
 
   // A finished phrase of yours: share it, then get and share translations
@@ -242,11 +247,15 @@ export function useCaptions({
           case "partial": {
             const text = clean(message.text, MAX_TEXT);
             if (!text) return;
+            const lang = clean(message.lang, 8);
             show({
               speakerId: from,
               speaker: clean(message.name, 60),
               text,
               final: false,
+              // Words in another language would only confuse: show that
+              // they are speaking, the translation comes when they pause
+              translating: Boolean(lang) && lang !== preferredLanguage,
             });
             break;
           }
@@ -273,6 +282,18 @@ export function useCaptions({
               translated: text,
               timestamp: new Date(),
             });
+            if (needsTranslation) {
+              // Translation lost or too slow: the original beats nothing
+              if (fallbackTimerRef.current) {
+                clearTimeout(fallbackTimerRef.current);
+              }
+              fallbackTimerRef.current = setTimeout(() => {
+                const current = liveRef.current;
+                if (current?.id === id && current.translating) {
+                  show({ ...current, translating: false });
+                }
+              }, TRANSLATION_TIMEOUT_MS);
+            }
             break;
           }
           case "translation": {
@@ -309,6 +330,7 @@ export function useCaptions({
   useEffect(() => {
     return () => {
       if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
+      if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
     };
   }, []);
 
