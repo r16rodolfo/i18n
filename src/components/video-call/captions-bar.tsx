@@ -88,7 +88,9 @@ export function CaptionsBar({
             <p
               className={cn(
                 "text-lg leading-snug",
-                caption.final ? "text-white" : "text-white/70 italic",
+                caption.final && !caption.interim
+                  ? "text-white"
+                  : "text-white/80 italic",
               )}
             >
               {caption.text}

@@ -27,6 +27,8 @@ interface TranslateCaptionInput {
   to: LanguageCode;
   // A few earlier phrases of the meeting, oldest first (context only)
   context: string[];
+  // The speaker is still talking: the phrase may stop mid-sentence
+  unfinished?: boolean;
 }
 
 export async function translateCaption({
@@ -34,6 +36,7 @@ export async function translateCaption({
   from,
   to,
   context,
+  unfinished = false,
 }: TranslateCaptionInput): Promise<string> {
   const earlier = context.length
     ? `Earlier in the meeting (context only, do not translate):\n${context
@@ -49,6 +52,11 @@ export async function translateCaption({
       "Keep names of people, companies and products exactly as they are.",
       "Keep the meaning and the tone, in a natural spoken style. If the speaker mixes in Guarani words, translate what they mean.",
       "If the phrase is already in the target language, return it unchanged.",
+      ...(unfinished
+        ? [
+            "The speaker is still talking, so the phrase may stop mid-sentence: translate only what is there and never complete it.",
+          ]
+        : []),
       "Answer with the translation only: no quotes, notes or explanations.",
     ].join("\n"),
     prompt: `${earlier}Phrase to translate:\n${text}`,

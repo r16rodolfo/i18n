@@ -135,8 +135,11 @@ env var, and `none` if the chosen provider has no keys. Currently:
     listeners' languages (`src/lib/caption-translation.ts`, OpenAI
     `OPENAI_TRANSLATION_MODEL`, default `gpt-5.4-mini`, reasoning off, 4
     earlier phrases as context), saves it in `transcripts`, and returns the
-    translations, which the speaker broadcasts. `CaptionsBar` shows the
-    translation with the original underneath.
+    translations, which the speaker broadcasts. While the person is still
+    talking, the unfinished phrase is translated about once a second
+    (`partial: true`, not saved) and broadcast as `partial-translation`.
+    Listeners only ever see text in their own language (a "translating"
+    hint until the first translation arrives).
   - Planned next: translated voice (ElevenLabs TTS, per-speaker
     female/male voice), glossary in `/admin`, agent reading `transcripts`.
   - Local testing: the local app shares the production DB, so don't pick

@@ -239,7 +239,7 @@ export function useScribe({
       language_code: language,
       audio_format: `pcm_${context.sampleRate}`,
       commit_strategy: "vad",
-      vad_silence_threshold_secs: "0.8",
+      vad_silence_threshold_secs: "0.6",
     });
     const ws = new WebSocket(`${SCRIBE_URL}?${params}`);
     wsRef.current = ws;
