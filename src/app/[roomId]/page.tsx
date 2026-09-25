@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 
 import { getTeamMember } from "@/lib/auth";
 import { getRoomAccess } from "@/lib/room-access";
+import { getActiveTranslationProvider } from "@/lib/translation-providers";
+import { getActiveVoiceEngine } from "@/lib/voice-engines";
 
 import { RoomClient } from "./room-client";
 
@@ -60,11 +62,17 @@ export default async function RoomPage({
     );
   }
 
+  // Soniox/ElevenLabs voice: each person picks theirs when joining
+  const voiceEngine = await getActiveVoiceEngine(
+    await getActiveTranslationProvider(),
+  );
+
   return (
     <RoomClient
       roomId={roomId}
       inviteToken={access.member ? null : inviteToken}
       isTeamMember={Boolean(access.member)}
+      askVoice={voiceEngine === "soniox" || voiceEngine === "elevenlabs"}
     />
   );
 }

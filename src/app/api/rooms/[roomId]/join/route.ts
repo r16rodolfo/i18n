@@ -10,6 +10,7 @@ import {
 import { isValidLanguageCode } from "@/lib/languages";
 import { getRoomAccess } from "@/lib/room-access";
 import { getActiveTranslationProvider } from "@/lib/translation-providers";
+import { getActiveVoiceEngine } from "@/lib/voice-engines";
 
 const JoinRequestSchema = z.object({
   visitorId: z.string().min(1).max(100),
@@ -175,6 +176,7 @@ export async function POST(
     }
 
     const { token } = await tokenRes.json();
+    const translationProvider = await getActiveTranslationProvider();
 
     return Response.json({
       token,
@@ -190,7 +192,8 @@ export async function POST(
       roomSettings: member
         ? { locked: Boolean(room.lockedAt), entryMode: room.entryMode }
         : null,
-      translationProvider: await getActiveTranslationProvider(),
+      translationProvider,
+      voiceEngine: await getActiveVoiceEngine(translationProvider),
     });
   } catch (error) {
     console.error("Error joining room:", error);

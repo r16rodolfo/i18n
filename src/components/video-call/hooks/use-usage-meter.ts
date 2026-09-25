@@ -6,8 +6,9 @@ import type { ServiceTotal } from "@/lib/usage";
 
 // Cost estimate of the meeting.
 // - Everyone: tells the server, about once a minute and when leaving, how
-//   long they were in the call and how long the translation engine was
-//   listening to them.
+//   long they were in the call, how long the translation engine was
+//   listening to them and, with the OpenAI voice, how long their
+//   translation sessions were open.
 // - Team: reads the meeting's estimated cost so far.
 
 const REPORT_EVERY_MS = 60_000;
@@ -25,6 +26,8 @@ interface UseUsageMeterOptions {
   engine: MeteredEngine | null;
   // Is the engine listening to this person right now?
   engineActive: boolean;
+  // OpenAI voice sessions open right now (one per person translated)
+  voiceStreams: number;
 }
 
 export function useUsageMeter({
@@ -34,11 +37,13 @@ export function useUsageMeter({
   visitorId,
   engine,
   engineActive,
+  voiceStreams,
 }: UseUsageMeterOptions) {
-  const pending = useRef({ callMs: 0, engineMs: 0 });
+  const pending = useRef({ callMs: 0, engineMs: 0, voiceMs: 0 });
   const lastTick = useRef(0);
   const engineActiveRef = useRef(engineActive);
   const engineRef = useRef(engine);
+  const voiceStreamsRef = useRef(voiceStreams);
 
   // Counts the time since the last tick with the state it had until now
   const tick = useCallback(() => {
@@ -48,20 +53,23 @@ export function useUsageMeter({
     if (elapsed <= 0) return;
     pending.current.callMs += elapsed;
     if (engineActiveRef.current) pending.current.engineMs += elapsed;
+    pending.current.voiceMs += elapsed * voiceStreamsRef.current;
   }, []);
 
   useEffect(() => {
     tick();
     engineActiveRef.current = engineActive;
     engineRef.current = engine;
-  }, [engineActive, engine, tick]);
+    voiceStreamsRef.current = voiceStreams;
+  }, [engineActive, engine, voiceStreams, tick]);
 
   const report = useCallback(() => {
     tick();
-    const { callMs, engineMs } = pending.current;
+    const { callMs, engineMs, voiceMs } = pending.current;
     if (callMs < 1000) return;
-    pending.current = { callMs: 0, engineMs: 0 };
-    const seconds = (ms: number) => Math.min(120, Math.round(ms / 1000));
+    pending.current = { callMs: 0, engineMs: 0, voiceMs: 0 };
+    const seconds = (ms: number, max = 120) =>
+      Math.min(max, Math.round(ms / 1000));
     // keepalive: still delivered when the page is closing
     fetch(`/api/rooms/${roomId}/usage`, {
       method: "POST",
@@ -73,6 +81,7 @@ export function useUsageMeter({
         callSeconds: seconds(callMs),
         engine: engineRef.current,
         engineSeconds: seconds(engineMs),
+        voiceSeconds: seconds(voiceMs, 600),
       }),
     }).catch(() => {
       // Lost report: the estimate is only a little low
@@ -82,7 +91,7 @@ export function useUsageMeter({
   useEffect(() => {
     if (!enabled) return;
     lastTick.current = Date.now();
-    pending.current = { callMs: 0, engineMs: 0 };
+    pending.current = { callMs: 0, engineMs: 0, voiceMs: 0 };
     const timer = setInterval(report, REPORT_EVERY_MS);
     window.addEventListener("pagehide", report);
     return () => {

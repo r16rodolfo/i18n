@@ -7,6 +7,7 @@ import { useDailyEvent } from "@daily-co/daily-react";
 import { nanoid } from "nanoid";
 
 import { isValidLanguageCode, type LanguageCode } from "@/lib/languages";
+import { isVoiceGender, type VoiceGender } from "@/lib/voice-options";
 
 import { findCut, splitWords } from "../caption-pieces";
 import type { LiveTranscript, TranscriptEntry } from "../types";
@@ -24,7 +25,9 @@ import type { LiveTranscript, TranscriptEntry } from "../types";
 //      (the server also saves it in the meeting transcript)
 //   3. broadcasts the translations
 // Everyone announces the language they want to read when they join, and
-// only ever sees text in that language.
+// only ever sees text in that language. With the translated voice on, each
+// piece translated into your language is also handed over to be read aloud
+// (in the voice its speaker picked).
 
 const MESSAGE_KIND = "r16-caption";
 const MAX_TEXT = 2000;
@@ -56,6 +59,8 @@ type CaptionMessage =
       lang: string;
       // Soniox: already translated, no separate "translation" message
       translations?: Record<string, string>;
+      // The voice the speaker picked for the translated voice
+      voice?: string;
     }
   | {
       kind: typeof MESSAGE_KIND;
@@ -85,6 +90,15 @@ export interface CaptionLine {
   translating: boolean;
 }
 
+// A piece translated into your language, to be read aloud
+export interface VoicePiece {
+  id: string;
+  // Daily session id of the speaker
+  speakerId: string;
+  text: string;
+  gender: VoiceGender;
+}
+
 export interface LiveCaption {
   speakerId: string;
   speaker: string;
@@ -107,6 +121,10 @@ interface UseCaptionsOptions {
   roomId: string;
   inviteToken: string | null;
   visitorId: string;
+  // The voice you picked for your translated speech
+  myVoice?: VoiceGender | null;
+  // Pieces of the others, translated into your language
+  onVoicePiece?: (piece: VoicePiece) => void;
 }
 
 export function useCaptions({
@@ -118,6 +136,8 @@ export function useCaptions({
   roomId,
   inviteToken,
   visitorId,
+  myVoice,
+  onVoicePiece,
 }: UseCaptionsOptions) {
   const [live, setLive] = useState<LiveCaption | null>(null);
   const [entries, setEntries] = useState<TranscriptEntry[]>([]);
@@ -125,6 +145,22 @@ export function useCaptions({
   const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Language each other participant wants to read, by Daily session id
   const languagesRef = useRef<Map<string, LanguageCode>>(new Map());
+  // The same, for rendering (e.g. lowering the original voice of people
+  // who speak another language)
+  const [languages, setLanguages] = useState<Record<string, LanguageCode>>(
+    {},
+  );
+  const syncLanguages = useCallback(() => {
+    setLanguages(Object.fromEntries(languagesRef.current));
+  }, []);
+  // Pieces waiting for their translation, to be read aloud once it comes
+  const pendingVoiceRef = useRef<
+    Map<string, { speakerId: string; gender: VoiceGender }>
+  >(new Map());
+  const onVoicePieceRef = useRef(onVoicePiece);
+  useEffect(() => {
+    onVoicePieceRef.current = onVoicePiece;
+  }, [onVoicePiece]);
 
   const setCaption = useCallback((caption: LiveCaption | null) => {
     if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
@@ -222,6 +258,7 @@ export function useCaptions({
         text,
         lang: spokenLanguage,
         ...(hasReady ? { translations: ready } : {}),
+        ...(myVoice ? { voice: myVoice } : {}),
       });
 
       // Saved in the transcript even when nobody needs a translation
@@ -268,6 +305,7 @@ export function useCaptions({
       addEntry,
       send,
       spokenLanguage,
+      myVoice,
       roomId,
       inviteToken,
       visitorId,
@@ -362,7 +400,10 @@ export function useCaptions({
         switch (message.type) {
           case "lang": {
             const lang = clean(message.lang, 8);
-            if (isValidLanguageCode(lang)) languagesRef.current.set(from, lang);
+            if (isValidLanguageCode(lang)) {
+              languagesRef.current.set(from, lang);
+              syncLanguages();
+            }
             // Someone just joined: tell them which language you want
             if (message.ask) {
               send({ type: "lang", lang: preferredLanguage }, from);
@@ -395,6 +436,19 @@ export function useCaptions({
             const needsTranslation =
               !ready && clean(message.lang, 8) !== preferredLanguage;
             const shown = ready || text;
+            const gender: VoiceGender = isVoiceGender(message.voice)
+              ? message.voice
+              : "female";
+            if (ready) {
+              onVoicePieceRef.current?.({
+                id,
+                speakerId: from,
+                text: ready,
+                gender,
+              });
+            } else if (needsTranslation) {
+              pendingVoiceRef.current.set(id, { speakerId: from, gender });
+            }
             const caption = captionFor(from, name);
             setCaption({
               ...caption,
@@ -416,6 +470,8 @@ export function useCaptions({
             if (needsTranslation) {
               // Translation lost or too slow: the original beats nothing
               setTimeout(() => {
+                // Too late to be read aloud
+                pendingVoiceRef.current.delete(id);
                 const line = liveRef.current?.lines.find((l) => l.id === id);
                 if (line?.translating) updateLine(id, { translating: false });
                 setEntries((prev) =>
@@ -434,6 +490,11 @@ export function useCaptions({
               MAX_TEXT,
             );
             if (!id || !text) return;
+            const voice = pendingVoiceRef.current.get(id);
+            if (voice) {
+              pendingVoiceRef.current.delete(id);
+              onVoicePieceRef.current?.({ id, text, ...voice });
+            }
             setEntries((prev) =>
               prev.map((entry) =>
                 entry.id === id
@@ -446,7 +507,15 @@ export function useCaptions({
           }
         }
       },
-      [preferredLanguage, send, captionFor, setCaption, addEntry, updateLine],
+      [
+        preferredLanguage,
+        send,
+        captionFor,
+        setCaption,
+        addEntry,
+        updateLine,
+        syncLanguages,
+      ],
     ),
   );
 
@@ -455,8 +524,11 @@ export function useCaptions({
     "participant-left",
     useCallback((event) => {
       const left = event?.participant?.session_id;
-      if (left) languagesRef.current.delete(left);
-    }, []),
+      if (left) {
+        languagesRef.current.delete(left);
+        syncLanguages();
+      }
+    }, [syncLanguages]),
   );
 
   // Announce the language you want, and ask the others for theirs
@@ -473,6 +545,7 @@ export function useCaptions({
   return {
     live,
     entries,
+    languages,
     publishPartial,
     publishFinal,
     showPartial,

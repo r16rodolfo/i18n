@@ -22,8 +22,10 @@ import { useRoomEntry } from "./hooks/use-room-entry";
 import { useScribe } from "./hooks/use-scribe";
 import { useSoniox } from "./hooks/use-soniox";
 import { useTranscription } from "./hooks/use-transcription";
+import { useTtsVoice } from "./hooks/use-tts-voice";
 import { useMeetingCost, useUsageMeter } from "./hooks/use-usage-meter";
 import { MeetingCost } from "./meeting-cost";
+import { OpenAIVoiceLink } from "./openai-voice";
 import { ParticipantTile } from "./participant-tile";
 import { ShareModal } from "./share-modal";
 import { TranscriptSidebar } from "./transcript-sidebar";
@@ -42,6 +44,8 @@ export function CallUI({
   visitorId,
   roomId,
   translationProvider,
+  voiceEngine,
+  voiceGender,
   inviteToken,
   isTeamMember,
   invitePath,
@@ -74,6 +78,26 @@ export function CallUI({
   useEffect(() => {
     setTranscriptOpen(window.matchMedia("(min-width: 1024px)").matches);
   }, []);
+  // Translated voice: each person turns it on/off (remembered, on at first)
+  const [hearVoice, setHearVoice] = useState(true);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("hearVoice") === "false") setHearVoice(false);
+    } catch {
+      // Storage blocked: keep it on
+    }
+  }, []);
+  const toggleVoice = useCallback(() => {
+    setHearVoice((current) => {
+      try {
+        localStorage.setItem("hearVoice", String(!current));
+      } catch {
+        // Storage blocked: only for this call
+      }
+      return !current;
+    });
+  }, []);
+
   const toggleCaptions = useCallback(() => {
     setShowCaptions((current) => {
       try {
@@ -120,6 +144,17 @@ export function CallUI({
 
   // Captions shared through Daily, floor control, your mic
   const inCall = !isJoining;
+  // Translated voice read from the captions (Soniox/ElevenLabs) or made
+  // straight from the speaker's audio (OpenAI)
+  const hasVoice = liveCaptions && voiceEngine !== "none";
+  const voiceOn = hasVoice && hearVoice && inCall;
+  const ttsVoice = useTtsVoice({
+    enabled: voiceOn && (voiceEngine === "soniox" || voiceEngine === "elevenlabs"),
+    roomId,
+    inviteToken,
+    visitorId,
+    language: preferredLanguage,
+  });
   const captions = useCaptions({
     daily,
     ready: inCall && liveCaptions,
@@ -129,6 +164,8 @@ export function CallUI({
     roomId,
     inviteToken,
     visitorId,
+    myVoice: voiceGender,
+    onVoicePiece: ttsVoice.speak,
   });
   const floor = useFloor({
     daily,
@@ -170,6 +207,48 @@ export function CallUI({
     ? liveTranscriptOf(captions.live)
     : liveTranscript;
 
+  // OpenAI voice: one session per person who speaks another language
+  const openAIVoiceOn = voiceOn && voiceEngine === "openai";
+  const translatedSpeakers = participantIds.filter((id) => {
+    const lang = captions.languages[id];
+    return Boolean(lang) && lang !== preferredLanguage;
+  });
+  const [openAISpeaking, setOpenAISpeaking] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [openAIConnected, setOpenAIConnected] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const updateSet = useCallback(
+    (set: Set<string>, id: string, on: boolean) => {
+      if (set.has(id) === on) return set;
+      const next = new Set(set);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    },
+    [],
+  );
+  const onOpenAISpeaking = useCallback(
+    (id: string, speaking: boolean) =>
+      setOpenAISpeaking((set) => updateSet(set, id, speaking)),
+    [updateSet],
+  );
+  const onOpenAIConnected = useCallback(
+    (id: string, connected: boolean) =>
+      setOpenAIConnected((set) => updateSet(set, id, connected)),
+    [updateSet],
+  );
+  // The translated voice is playing for you right now
+  const voiceSpeaking =
+    voiceOn && (ttsVoice.speakingFor !== null || openAISpeaking.size > 0);
+  // With the voice on, the original voice of people who speak another
+  // language is kept low (you hear them through the translation)
+  const volumeFor = (sessionId: string) =>
+    voiceOn && translatedSpeakers.includes(sessionId)
+      ? 0.15
+      : originalVolume;
+
   // Team only: lock/entry mode of the room and guests waiting to get in
   const roomEntry = useRoomEntry(
     roomId,
@@ -191,6 +270,7 @@ export function CallUI({
           ? "palabra"
           : null,
     engineActive: liveCaptions ? micOpen : translatedVoiceActive,
+    voiceStreams: openAIVoiceOn ? openAIConnected.size : 0,
   });
   const meetingCost = useMeetingCost(roomId, isTeamMember && inCall);
 
@@ -372,9 +452,21 @@ export function CallUI({
               <ParticipantTile
                 key={id}
                 sessionId={id}
-                originalVolume={originalVolume}
+                originalVolume={volumeFor(id)}
               />
             ))}
+            {openAIVoiceOn &&
+              translatedSpeakers.map((id) => (
+                <OpenAIVoiceLink
+                  key={`voice-${id}`}
+                  sessionId={id}
+                  roomId={roomId}
+                  inviteToken={inviteToken}
+                  language={preferredLanguage}
+                  onSpeaking={onOpenAISpeaking}
+                  onConnected={onOpenAIConnected}
+                />
+              ))}
           </div>
 
           {isTeamMember && <MeetingCost cost={meetingCost} />}
@@ -439,6 +531,7 @@ export function CallUI({
                   : (floor.holder?.name ?? null),
                 onTake: floor.take,
                 onRelease: floor.release,
+                waitForVoice: voiceSpeaking,
               }
             : undefined
         }
@@ -468,6 +561,9 @@ export function CallUI({
                 onToggle: () => setTranscriptOpen((open) => !open),
               }
             : undefined
+        }
+        voiceToggle={
+          hasVoice ? { enabled: hearVoice, onToggle: toggleVoice } : undefined
         }
         captionsToggle={
           liveCaptions

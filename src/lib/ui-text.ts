@@ -96,6 +96,12 @@ const TEXT = {
     floorLockOff: "Trava de fala desligada (clique para ligar)",
     captionsError:
       "A transcrição não está funcionando. Tente sair e entrar de novo.",
+    yourVoice: "Sua voz na tradução",
+    voiceFemale: "Feminina",
+    voiceMale: "Masculina",
+    voiceOn: "Ouvindo a tradução por voz (clique para desligar)",
+    voiceOff: "Tradução por voz desligada (clique para ouvir)",
+    floorWaitVoice: "Aguarde a tradução",
   },
   es: {
     joinEyebrow: "[ UNIRSE A LA REUNIÓN ]",
@@ -152,6 +158,12 @@ const TEXT = {
     floorLockOff: "Turno de palabra desactivado (clic para activar)",
     captionsError:
       "La transcripción no está funcionando. Intenta salir y volver a entrar.",
+    yourVoice: "Tu voz en la traducción",
+    voiceFemale: "Femenina",
+    voiceMale: "Masculina",
+    voiceOn: "Escuchando la traducción por voz (clic para apagar)",
+    voiceOff: "Traducción por voz apagada (clic para escuchar)",
+    floorWaitVoice: "Espera la traducción",
   },
 } satisfies Record<UiLang, Record<string, unknown>>;
 

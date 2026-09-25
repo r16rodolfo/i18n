@@ -17,12 +17,22 @@ import {
   formatUsd,
   USAGE_SERVICE_INFO,
 } from "@/lib/usage-pricing";
+import {
+  getSelectedVoiceEngine,
+  isVoiceEngineConfigured,
+  VOICE_ENGINE_INFO,
+  VOICE_ENGINES,
+} from "@/lib/voice-engines";
 
 import { TeamHeader } from "@/components/team-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
-import { changeTeamMember, setTranslationProvider } from "./actions";
+import {
+  changeTeamMember,
+  setTranslationProvider,
+  setVoiceEngine,
+} from "./actions";
 
 export const metadata = { title: "Administração · R16 Meet" };
 
@@ -47,10 +57,13 @@ export default async function AdminPage({
   const admin = await requireAdmin();
   const { erro } = await searchParams;
 
-  const [selectedProvider, monthUsage] = await Promise.all([
+  const [selectedProvider, selectedVoice, monthUsage] = await Promise.all([
     getSelectedTranslationProvider(),
+    getSelectedVoiceEngine(),
     getMonthUsage(currentMonth()),
   ]);
+  const voiceWorks =
+    selectedProvider === "soniox" || selectedProvider === "elevenlabs";
 
   // Every Supabase account, with its access level in the app (if any).
   // Accounts are created in the Supabase dashboard, access is granted here.
@@ -188,6 +201,98 @@ export default async function AdminPage({
                   {!isSelected && configured && (
                     <form action={setTranslationProvider}>
                       <input type="hidden" name="provider" value={provider} />
+                      <Button
+                        type="submit"
+                        size="sm"
+                        variant="outline"
+                        className="cursor-pointer"
+                      >
+                        Usar este
+                      </Button>
+                    </form>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+
+        {/* Translated voice */}
+        <section className="space-y-4">
+          <div className="space-y-1">
+            <h2 className="text-lg font-medium text-black">Voz traduzida</h2>
+            <p className="text-sm text-neutral-600">
+              Além da legenda, cada pessoa ouve os outros na própria língua
+              (e pode desligar a voz na chamada). Funciona junto com a
+              tradução Soniox ou ElevenLabs + OpenAI.
+            </p>
+          </div>
+
+          {!voiceWorks && selectedVoice !== "none" && (
+            <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              A tradução em uso não tem legendas, então a voz escolhida fica
+              desligada até você usar a Soniox ou a ElevenLabs + OpenAI.
+            </p>
+          )}
+
+          {erro === "voz-soniox" && (
+            <p
+              role="alert"
+              className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+            >
+              A Soniox recusou a chave para voz. Confira no painel da Soniox se
+              a chave tem a permissão de &quot;Text-to-speech&quot; e se a conta
+              tem saldo.
+            </p>
+          )}
+          {erro === "voz-elevenlabs" && (
+            <p
+              role="alert"
+              className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+            >
+              A ElevenLabs recusou a chave para voz. No painel da ElevenLabs,
+              dê à chave a permissão de &quot;Text to Speech&quot; (e confira
+              se a ELEVENLABS_API_KEY está na Vercel).
+            </p>
+          )}
+          {erro === "voz-openai" && (
+            <p
+              role="alert"
+              className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+            >
+              A OpenAI recusou a chave para voz. No painel da OpenAI, dê à
+              chave a permissão &quot;Realtime&quot; e tente de novo.
+            </p>
+          )}
+
+          <ul className="space-y-2">
+            {VOICE_ENGINES.map((engine) => {
+              const info = VOICE_ENGINE_INFO[engine];
+              const configured = isVoiceEngineConfigured(engine);
+              const isSelected = engine === selectedVoice;
+
+              return (
+                <li
+                  key={engine}
+                  className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-white p-4 ${
+                    isSelected ? "border-black" : "border-neutral-200"
+                  }`}
+                >
+                  <div className="min-w-0 space-y-1">
+                    <p className="font-medium text-black flex items-center gap-2">
+                      {info.label}
+                      {isSelected && <Badge>Em uso</Badge>}
+                      {!configured && (
+                        <Badge variant="outline">Chave não configurada</Badge>
+                      )}
+                    </p>
+                    <p className="text-sm text-neutral-600">
+                      {info.description}
+                    </p>
+                  </div>
+                  {!isSelected && configured && (
+                    <form action={setVoiceEngine}>
+                      <input type="hidden" name="engine" value={engine} />
                       <Button
                         type="submit"
                         size="sm"

@@ -7,6 +7,12 @@ import { ArrowRight, Hourglass, Loader2 } from "lucide-react";
 import type { EntryMode } from "@/db/schema";
 import type { LanguageCode } from "@/lib/languages";
 import type { TranslationProvider } from "@/lib/translation-providers";
+import {
+  isVoiceEngine,
+  isVoiceGender,
+  type VoiceEngine,
+  type VoiceGender,
+} from "@/lib/voice-options";
 import { languageName, type UiLang, uiText } from "@/lib/ui-text";
 
 import { LanguageSelector } from "@/components/language-selector";
@@ -21,12 +27,15 @@ interface RoomClientProps {
   // Guests: the token from their invite link. Team members: null.
   inviteToken: string | null;
   isTeamMember: boolean;
+  // Ask which voice reads your speech in translation (female/male)
+  askVoice: boolean;
 }
 
 export function RoomClient({
   roomId,
   inviteToken,
   isTeamMember,
+  askVoice,
 }: RoomClientProps) {
   const { visitorId, isLoading: isLoadingFingerprint } = useFingerprint();
 
@@ -40,11 +49,13 @@ export function RoomClient({
     useState<LanguageCode>(defaultLanguage);
   const [preferredLanguage, setPreferredLanguage] =
     useState<LanguageCode>(defaultLanguage);
+  const [voiceGender, setVoiceGender] = useState<VoiceGender>("female");
   const [isJoining, setIsJoining] = useState(false);
   const [joined, setJoined] = useState<{
     roomUrl: string;
     token: string;
     translationProvider: TranslationProvider;
+    voiceEngine: VoiceEngine;
     invitePath: string | null;
     roomSettings: { locked: boolean; entryMode: EntryMode } | null;
   } | null>(null);
@@ -58,6 +69,8 @@ export function RoomClient({
       const storedName = localStorage.getItem("username");
       const storedSpoken = localStorage.getItem("spokenLanguage");
       const storedPreferred = localStorage.getItem("preferredLanguage");
+      const storedVoice = localStorage.getItem("voiceGender");
+      if (isVoiceGender(storedVoice)) setVoiceGender(storedVoice);
       if (storedName) setUsername(storedName);
       if (storedSpoken) setSpokenLanguage(storedSpoken as LanguageCode);
       if (storedPreferred)
@@ -116,6 +129,9 @@ export function RoomClient({
           roomUrl: data.roomUrl,
           token: data.token,
           translationProvider: data.translationProvider ?? "none",
+          voiceEngine: isVoiceEngine(data.voiceEngine)
+            ? data.voiceEngine
+            : "none",
           invitePath: data.invitePath ?? null,
           roomSettings: data.roomSettings ?? null,
         });
@@ -156,6 +172,8 @@ export function RoomClient({
         visitorId={visitorId}
         roomId={roomId}
         translationProvider={joined.translationProvider}
+        voiceEngine={joined.voiceEngine}
+        voiceGender={voiceGender}
         inviteToken={inviteToken}
         isTeamMember={isTeamMember}
         invitePath={joined.invitePath}
@@ -254,6 +272,35 @@ export function RoomClient({
                 uiLang={uiLang}
               />
             </div>
+
+            {askVoice && (
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-medium text-black">
+                  {t.yourVoice}
+                </legend>
+                <div className="grid grid-cols-2 gap-2">
+                  {(["female", "male"] as const).map((gender) => (
+                    <button
+                      key={gender}
+                      type="button"
+                      onClick={() => {
+                        setVoiceGender(gender);
+                        remember("voiceGender", gender);
+                      }}
+                      disabled={isJoining}
+                      aria-pressed={voiceGender === gender}
+                      className={`h-10 rounded-md border text-sm cursor-pointer transition-colors ${
+                        voiceGender === gender
+                          ? "border-black bg-black text-white"
+                          : "border-neutral-300 bg-white text-black hover:border-neutral-500"
+                      }`}
+                    >
+                      {gender === "female" ? t.voiceFemale : t.voiceMale}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+            )}
 
             {error && (
               <p className="text-sm text-red-600 text-center">{error}</p>

@@ -16,6 +16,12 @@ import {
   isTranslationProvider,
   TRANSLATION_PROVIDER_SETTING,
 } from "@/lib/translation-providers";
+import {
+  isVoiceEngine,
+  isVoiceEngineConfigured,
+  VOICE_ENGINE_SETTING,
+  verifyVoiceEngine,
+} from "@/lib/voice-engines";
 
 // Server actions are reachable by anyone who can send a POST, so every
 // action checks for an admin itself instead of trusting the page.
@@ -57,6 +63,30 @@ export async function setTranslationProvider(formData: FormData) {
     .onConflictDoUpdate({
       target: appSettings.key,
       set: { value: provider, updatedBy: admin.userId, updatedAt: new Date() },
+    });
+
+  revalidatePath("/admin");
+  redirect("/admin");
+}
+
+export async function setVoiceEngine(formData: FormData) {
+  const admin = await assertAdmin();
+
+  const engine = formData.get("engine");
+  if (!isVoiceEngine(engine)) throw new Error("Opção de voz inválida");
+  if (!isVoiceEngineConfigured(engine)) {
+    throw new Error("A chave deste serviço não está configurada");
+  }
+  if (!(await verifyVoiceEngine(engine))) {
+    redirect(`/admin?erro=voz-${engine}`);
+  }
+
+  await db
+    .insert(appSettings)
+    .values({ key: VOICE_ENGINE_SETTING, value: engine, updatedBy: admin.userId })
+    .onConflictDoUpdate({
+      target: appSettings.key,
+      set: { value: engine, updatedBy: admin.userId, updatedAt: new Date() },
     });
 
   revalidatePath("/admin");
