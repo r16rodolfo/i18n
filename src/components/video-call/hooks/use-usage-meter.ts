@@ -28,6 +28,8 @@ interface UseUsageMeterOptions {
   engineActive: boolean;
   // OpenAI voice sessions open right now (one per person translated)
   voiceStreams: number;
+  // Soniox voice made in your browser: seconds of speech since last asked
+  takeTtsSeconds?: () => number;
 }
 
 export function useUsageMeter({
@@ -38,12 +40,15 @@ export function useUsageMeter({
   engine,
   engineActive,
   voiceStreams,
+  takeTtsSeconds,
 }: UseUsageMeterOptions) {
   const pending = useRef({ callMs: 0, engineMs: 0, voiceMs: 0 });
   const lastTick = useRef(0);
   const engineActiveRef = useRef(engineActive);
   const engineRef = useRef(engine);
   const voiceStreamsRef = useRef(voiceStreams);
+  const takeTtsSecondsRef = useRef(takeTtsSeconds);
+  takeTtsSecondsRef.current = takeTtsSeconds;
 
   // Counts the time since the last tick with the state it had until now
   const tick = useCallback(() => {
@@ -82,6 +87,7 @@ export function useUsageMeter({
         engine: engineRef.current,
         engineSeconds: seconds(engineMs),
         voiceSeconds: seconds(voiceMs, 600),
+        ttsSeconds: Math.min(600, takeTtsSecondsRef.current?.() ?? 0),
       }),
     }).catch(() => {
       // Lost report: the estimate is only a little low

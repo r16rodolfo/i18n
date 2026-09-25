@@ -140,12 +140,13 @@ export default async function CostsPage({
             )}
           </div>
           <p className="text-xs text-neutral-500">
-            Vídeo: o Daily não cobra os primeiros{" "}
-            {DAILY_FREE_MINUTES.toLocaleString("pt-BR")} minutos do mês (somando
-            todas as pessoas de cada chamada). Neste mês foram{" "}
+            Vídeo: o Daily só cobra depois de{" "}
+            {DAILY_FREE_MINUTES.toLocaleString("pt-BR")} minutos no mês (somando
+            todas as pessoas de cada chamada), e os valores acima já descontam
+            isso. Neste mês foram{" "}
             {Math.round(videoMinutes).toLocaleString("pt-BR")} minutos
             {videoMinutes <= DAILY_FREE_MINUTES
-              ? ", então o vídeo ainda sai de graça."
+              ? ", então o vídeo ainda está saindo de graça."
               : "."}
           </p>
         </section>

@@ -104,6 +104,20 @@ export function currentMonth(now = new Date()) {
   return `${brazil.getUTCFullYear()}-${String(brazil.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
+// Video seconds used so far this month (Daily's free allowance is monthly)
+export async function getMonthVideoSeconds(now = new Date()) {
+  const { start } = monthRange(currentMonth(now));
+  const [row] = await db
+    .select({
+      seconds: sql<number>`coalesce(sum(${usageEvents.quantity}), 0)`,
+    })
+    .from(usageEvents)
+    .where(
+      and(eq(usageEvents.service, "video"), gte(usageEvents.createdAt, start)),
+    );
+  return Number(row?.seconds ?? 0);
+}
+
 // Totals by service for a month ("2026-09")
 export async function getMonthUsage(month: string) {
   const { start, end } = monthRange(month);

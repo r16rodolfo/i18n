@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { SonioxVoiceClient } from "../soniox-voice-client";
 import type { VoicePiece } from "./use-captions";
 
 // Soniox/ElevenLabs voice: reads aloud the pieces translated into your
 // language, one after the other, in the voice each speaker picked. Each
-// piece is asked from the server as soon as it arrives (so the next one is
-// ready while the current one plays) and played as its audio streams in.
+// piece is asked for as soon as it arrives (so the next one is ready while
+// the current one plays) and played as its audio streams in: Soniox
+// straight from the browser over a connection kept open (fastest),
+// ElevenLabs through our server.
 // When pieces pile up, the next ones are read a little faster; very old
 // ones are skipped (the captions still show them).
 
@@ -20,6 +23,7 @@ interface UseTtsVoiceOptions {
   visitorId: string;
   // The language you hear the others in
   language: string;
+  engine: "soniox" | "elevenlabs";
 }
 
 interface QueuedPiece {
@@ -33,6 +37,7 @@ export function useTtsVoice({
   inviteToken,
   visitorId,
   language,
+  engine,
 }: UseTtsVoiceOptions) {
   const [speakingFor, setSpeakingFor] = useState<string | null>(null);
   const contextRef = useRef<AudioContext | null>(null);
@@ -41,6 +46,27 @@ export function useTtsVoice({
   // When the audio scheduled so far ends (AudioContext time)
   const endsAtRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
+  const sonioxRef = useRef<SonioxVoiceClient | null>(null);
+  const useSonioxDirect = enabled && engine === "soniox";
+
+  // Soniox: open the connection as soon as the voice is on
+  useEffect(() => {
+    if (!useSonioxDirect) return;
+    const client = new SonioxVoiceClient(roomId, inviteToken);
+    sonioxRef.current = client;
+    client.warm();
+    return () => {
+      client.close();
+      if (sonioxRef.current === client) sonioxRef.current = null;
+    };
+  }, [useSonioxDirect, roomId, inviteToken]);
+
+  // Seconds of Soniox speech received since the last call (cost estimate;
+  // the ElevenLabs voice is counted by our server)
+  const takeAudioSeconds = useCallback(
+    () => sonioxRef.current?.takeAudioSeconds() ?? 0,
+    [],
+  );
 
   const getContext = useCallback(() => {
     if (!contextRef.current) contextRef.current = new AudioContext();
@@ -145,6 +171,18 @@ export function useTtsVoice({
       }
       const waiting = queueRef.current.length;
       const speed = waiting >= 2 ? 1.25 : waiting === 1 ? 1.12 : 1;
+      const soniox = sonioxRef.current;
+      if (soniox) {
+        const response = soniox
+          .speak({ text: piece.text, language, gender: piece.gender, speed })
+          .catch((error) => {
+            console.error("[Voice] Soniox failed:", error);
+            return null;
+          });
+        queueRef.current.push({ piece, response });
+        playQueue();
+        return;
+      }
       if (!abortRef.current) abortRef.current = new AbortController();
       const response = fetch(`/api/rooms/${encodeURIComponent(roomId)}/voice`, {
         method: "POST",
@@ -190,5 +228,5 @@ export function useTtsVoice({
     };
   }, []);
 
-  return { speak, speakingFor };
+  return { speak, speakingFor, takeAudioSeconds };
 }

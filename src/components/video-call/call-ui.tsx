@@ -149,11 +149,13 @@ export function CallUI({
   const hasVoice = liveCaptions && voiceEngine !== "none";
   const voiceOn = hasVoice && hearVoice && inCall;
   const ttsVoice = useTtsVoice({
-    enabled: voiceOn && (voiceEngine === "soniox" || voiceEngine === "elevenlabs"),
+    enabled:
+      voiceOn && (voiceEngine === "soniox" || voiceEngine === "elevenlabs"),
     roomId,
     inviteToken,
     visitorId,
     language: preferredLanguage,
+    engine: voiceEngine === "elevenlabs" ? "elevenlabs" : "soniox",
   });
   const captions = useCaptions({
     daily,
@@ -220,16 +222,13 @@ export function CallUI({
   const [openAIConnected, setOpenAIConnected] = useState<Set<string>>(
     () => new Set(),
   );
-  const updateSet = useCallback(
-    (set: Set<string>, id: string, on: boolean) => {
-      if (set.has(id) === on) return set;
-      const next = new Set(set);
-      if (on) next.add(id);
-      else next.delete(id);
-      return next;
-    },
-    [],
-  );
+  const updateSet = useCallback((set: Set<string>, id: string, on: boolean) => {
+    if (set.has(id) === on) return set;
+    const next = new Set(set);
+    if (on) next.add(id);
+    else next.delete(id);
+    return next;
+  }, []);
   const onOpenAISpeaking = useCallback(
     (id: string, speaking: boolean) =>
       setOpenAISpeaking((set) => updateSet(set, id, speaking)),
@@ -246,9 +245,7 @@ export function CallUI({
   // With the voice on, the original voice of people who speak another
   // language is kept low (you hear them through the translation)
   const volumeFor = (sessionId: string) =>
-    voiceOn && translatedSpeakers.includes(sessionId)
-      ? 0.15
-      : originalVolume;
+    voiceOn && translatedSpeakers.includes(sessionId) ? 0.15 : originalVolume;
 
   // Team only: lock/entry mode of the room and guests waiting to get in
   const roomEntry = useRoomEntry(
@@ -272,6 +269,7 @@ export function CallUI({
           : null,
     engineActive: liveCaptions ? micOpen : translatedVoiceActive,
     voiceStreams: openAIVoiceOn ? openAIConnected.size : 0,
+    takeTtsSeconds: ttsVoice.takeAudioSeconds,
   });
   const meetingCost = useMeetingCost(roomId, isTeamMember && inCall);
 

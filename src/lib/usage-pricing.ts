@@ -81,6 +81,17 @@ export function timeCost(service: UsageService, seconds: number) {
   return price == null ? null : seconds * price;
 }
 
+// Daily video: only the participant-minutes beyond the month's free
+// allowance are paid. `monthSecondsBefore` is what the month had used
+// before this piece of call time.
+export function dailyVideoCost(monthSecondsBefore: number, seconds: number) {
+  const free = DAILY_FREE_MINUTES * 60;
+  const paid =
+    Math.max(0, monthSecondsBefore + seconds - free) -
+    Math.max(0, monthSecondsBefore - free);
+  return paid * (0.004 / 60);
+}
+
 export function characterCost(service: UsageService, characters: number) {
   const price = PER_CHARACTER[service];
   return price == null ? null : characters * price;

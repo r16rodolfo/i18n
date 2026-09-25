@@ -2,8 +2,13 @@ import { z } from "zod";
 
 import { getRoomAccess } from "@/lib/room-access";
 import { getTeamRoom } from "@/lib/team-room";
-import { getRoomUsage, recordUsage, type UsageRecord } from "@/lib/usage";
-import { timeCost } from "@/lib/usage-pricing";
+import {
+  getMonthVideoSeconds,
+  getRoomUsage,
+  recordUsage,
+  type UsageRecord,
+} from "@/lib/usage";
+import { dailyVideoCost, timeCost } from "@/lib/usage-pricing";
 
 // How long each person spent in the call, how long their mic was being
 // transcribed and how long their OpenAI voice sessions were open, reported
@@ -33,6 +38,12 @@ const ReportSchema = z.object({
     .min(0)
     .max(MAX_SECONDS * 5)
     .default(0),
+  // Soniox voice made in this person's browser: seconds of speech heard
+  ttsSeconds: z
+    .number()
+    .min(0)
+    .max(MAX_SECONDS * 5)
+    .default(0),
 });
 
 export async function POST(
@@ -51,6 +62,8 @@ export async function POST(
     return Response.json({ error: "Não autorizado" }, { status: 401 });
   }
   const { room } = access;
+  // The first 10,000 minutes of the month are free on Daily
+  const monthVideoSeconds = await getMonthVideoSeconds();
 
   const records: UsageRecord[] = [
     {
@@ -58,7 +71,7 @@ export async function POST(
       roomId: room.id,
       service: "video",
       quantity: report.callSeconds,
-      costUsd: timeCost("video", report.callSeconds),
+      costUsd: dailyVideoCost(monthVideoSeconds, report.callSeconds),
       visitorId: report.visitorId,
     },
   ];
@@ -81,6 +94,16 @@ export async function POST(
       service: "voice_openai",
       quantity: report.voiceSeconds,
       costUsd: timeCost("voice_openai", report.voiceSeconds),
+      visitorId: report.visitorId,
+    });
+  }
+  if (report.ttsSeconds > 0) {
+    records.push({
+      roomName: room.dailyRoomName,
+      roomId: room.id,
+      service: "tts_soniox",
+      quantity: report.ttsSeconds,
+      costUsd: timeCost("tts_soniox", report.ttsSeconds),
       visitorId: report.visitorId,
     });
   }
