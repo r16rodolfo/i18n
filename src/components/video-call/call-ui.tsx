@@ -22,6 +22,8 @@ import { useRoomEntry } from "./hooks/use-room-entry";
 import { useScribe } from "./hooks/use-scribe";
 import { useSoniox } from "./hooks/use-soniox";
 import { useTranscription } from "./hooks/use-transcription";
+import { useMeetingCost, useUsageMeter } from "./hooks/use-usage-meter";
+import { MeetingCost } from "./meeting-cost";
 import { ParticipantTile } from "./participant-tile";
 import { ShareModal } from "./share-modal";
 import { TranscriptSidebar } from "./transcript-sidebar";
@@ -174,6 +176,23 @@ export function CallUI({
     roomSettings,
     isTeamMember && !isJoining,
   );
+
+  // Cost estimate: everyone reports their time, the team sees the total
+  useUsageMeter({
+    enabled: inCall,
+    roomId,
+    inviteToken,
+    visitorId,
+    engine: useSonioxEngine
+      ? "soniox"
+      : useElevenLabs
+        ? "elevenlabs"
+        : usePalabra
+          ? "palabra"
+          : null,
+    engineActive: liveCaptions ? micOpen : translatedVoiceActive,
+  });
+  const meetingCost = useMeetingCost(roomId, isTeamMember && inCall);
 
   // Proactive intent detection for email actions (team only: the agent
   // routes spend OpenAI credits and can send e-mail)
@@ -357,6 +376,8 @@ export function CallUI({
               />
             ))}
           </div>
+
+          {isTeamMember && <MeetingCost cost={meetingCost} />}
 
           {isTeamMember && (
             <WaitingGuests

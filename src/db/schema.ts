@@ -1,6 +1,7 @@
 import { relations, sql } from "drizzle-orm";
 import {
   check,
+  doublePrecision,
   index,
   jsonb,
   pgTable,
@@ -10,6 +11,8 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { authUsers } from "drizzle-orm/supabase";
+
+import { USAGE_SERVICES, type UsageService } from "../lib/usage-pricing";
 
 // RLS is enabled on every table with no policies: the app talks to the
 // database only from the server (as the table owner), so Supabase's public
@@ -156,6 +159,39 @@ export const transcripts = pgTable(
   ],
 ).enableRLS();
 
+// What each meeting used of the paid services, to estimate its cost.
+// Rows outlive the room (room_id is cleared, the name stays) so the
+// monthly totals do not change when a room is deleted.
+export const usageEvents = pgTable(
+  "usage_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    roomId: uuid("room_id").references(() => rooms.id, {
+      onDelete: "set null",
+    }),
+    roomName: text("room_name").notNull(),
+    service: text("service").$type<UsageService>().notNull(),
+    // Seconds, tokens or calls, depending on the service
+    quantity: doublePrecision("quantity").notNull(),
+    // Estimated cost in US dollars at the time; null = no price on file
+    costUsd: doublePrecision("cost_usd"),
+    visitorId: text("visitor_id"),
+    // e.g. model and input/output tokens
+    detail: jsonb("detail").$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("usage_events_room_id_idx").on(table.roomId),
+    index("usage_events_created_at_idx").on(table.createdAt),
+    check(
+      "usage_events_service_check",
+      sql.raw(
+        `service in (${USAGE_SERVICES.map((s) => `'${s}'`).join(", ")})`,
+      ),
+    ),
+  ],
+).enableRLS();
+
 // Relations
 export const roomsRelations = relations(rooms, ({ many }) => ({
   participants: many(participants),
@@ -185,3 +221,4 @@ export type NewParticipant = typeof participants.$inferInsert;
 export type Transcript = typeof transcripts.$inferSelect;
 export type JoinRequest = typeof joinRequests.$inferSelect;
 export type NewTranscript = typeof transcripts.$inferInsert;
+export type UsageEvent = typeof usageEvents.$inferSelect;

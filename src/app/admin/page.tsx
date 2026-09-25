@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { sql } from "drizzle-orm";
 
 import { db } from "@/db";
@@ -9,6 +11,12 @@ import {
   TRANSLATION_PROVIDER_INFO,
   TRANSLATION_PROVIDERS,
 } from "@/lib/translation-providers";
+import { currentMonth, getMonthUsage } from "@/lib/usage";
+import {
+  formatQuantity,
+  formatUsd,
+  USAGE_SERVICE_INFO,
+} from "@/lib/usage-pricing";
 
 import { TeamHeader } from "@/components/team-header";
 import { Badge } from "@/components/ui/badge";
@@ -39,7 +47,10 @@ export default async function AdminPage({
   const admin = await requireAdmin();
   const { erro } = await searchParams;
 
-  const selectedProvider = await getSelectedTranslationProvider();
+  const [selectedProvider, monthUsage] = await Promise.all([
+    getSelectedTranslationProvider(),
+    getMonthUsage(currentMonth()),
+  ]);
 
   // Every Supabase account, with its access level in the app (if any).
   // Accounts are created in the Supabase dashboard, access is granted here.
@@ -58,6 +69,51 @@ export default async function AdminPage({
         <h1 className="text-3xl font-light tracking-tight text-black">
           Administração
         </h1>
+
+        {/* This month's estimated cost */}
+        <section className="space-y-4">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <div className="space-y-1">
+              <h2 className="text-lg font-medium text-black">Custo do mês</h2>
+              <p className="text-sm text-neutral-600">
+                Estimativa pelo preço de tabela, em dólar.
+              </p>
+            </div>
+            <Link
+              href="/custos"
+              className="text-sm text-neutral-600 underline hover:text-black"
+            >
+              Ver por reunião
+            </Link>
+          </div>
+          <div className="rounded-xl border border-neutral-200 bg-white">
+            <p className="p-4 text-2xl font-light tabular-nums text-black">
+              {formatUsd(monthUsage.totalUsd)}
+            </p>
+            {monthUsage.services.length > 0 && (
+              <ul className="divide-y divide-neutral-200 border-t border-neutral-200">
+                {monthUsage.services.map((item) => (
+                  <li
+                    key={item.service}
+                    className="flex items-center justify-between gap-3 px-4 py-2 text-sm"
+                  >
+                    <span className="min-w-0 text-black">
+                      {USAGE_SERVICE_INFO[item.service]?.label ?? item.service}
+                      <span className="ml-2 text-xs text-neutral-500">
+                        {formatQuantity(item.service, item.quantity)}
+                      </span>
+                    </span>
+                    <span className="shrink-0 tabular-nums">
+                      {item.service === "palabra"
+                        ? "sem preço"
+                        : formatUsd(item.costUsd)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
 
         {/* Translation provider */}
         <section className="space-y-4">

@@ -5,6 +5,8 @@ import { desc, gt } from "drizzle-orm";
 import { db } from "@/db";
 import { rooms } from "@/db/schema";
 import { requireTeamMember } from "@/lib/auth";
+import { getRoomsCost } from "@/lib/usage";
+import { formatUsd } from "@/lib/usage-pricing";
 
 import { CopyInviteButton } from "@/components/copy-invite-button";
 import { TeamHeader } from "@/components/team-header";
@@ -30,6 +32,7 @@ export default async function HomePage() {
     orderBy: desc(rooms.createdAt),
     limit: 20,
   });
+  const costs = await getRoomsCost(activeRooms.map((room) => room.id));
 
   return (
     <div className="min-h-screen bg-neutral-100">
@@ -71,6 +74,15 @@ export default async function HomePage() {
                       Criada às {timeFormat.format(room.createdAt)}
                       {room.expiresAt &&
                         ` · fecha às ${timeFormat.format(room.expiresAt)}`}
+                    </p>
+                    <p className="text-xs text-neutral-500">
+                      <Link
+                        href="/custos"
+                        className="hover:text-black"
+                        title="Custo estimado até agora (preço de tabela, em dólar)"
+                      >
+                        Custo até agora: {formatUsd(costs.get(room.id) ?? 0)}
+                      </Link>
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center justify-end gap-2">

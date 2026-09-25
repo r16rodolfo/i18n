@@ -13,6 +13,9 @@ export function TeamHeader({ member }: { member: CurrentMember }) {
           R16 Meet
         </Link>
         <nav className="flex items-center gap-4 text-sm">
+          <Link href="/custos" className="text-neutral-600 hover:text-black">
+            Custos
+          </Link>
           {member.role === "admin" && (
             <Link href="/admin" className="text-neutral-600 hover:text-black">
               Administração
