@@ -3,12 +3,16 @@
 import {
   Captions,
   CaptionsOff,
+  DoorOpen,
   Hand,
   Info,
+  Lock,
+  LockOpen,
   MessageSquareText,
   Mic,
   MicOff,
   PhoneOff,
+  ShieldCheck,
   Video,
   VideoOff,
 } from "lucide-react";
@@ -32,6 +36,14 @@ export interface FloorControls {
 export interface CaptionsToggle {
   enabled: boolean;
   onToggle: () => void;
+}
+
+// Team only: lock the room (no new guests) and choose how guests get in
+export interface RoomControls {
+  locked: boolean;
+  approvalRequired: boolean;
+  onToggleLock: () => void;
+  onToggleApproval: () => void;
 }
 
 // Open/close the transcript column
@@ -59,6 +71,7 @@ interface CallControlsProps {
   floorToggle?: FloorToggle;
   captionsToggle?: CaptionsToggle;
   transcriptToggle?: TranscriptToggle;
+  roomControls?: RoomControls;
   uiLang: UiLang;
 }
 
@@ -74,6 +87,7 @@ export function CallControls({
   floorToggle,
   captionsToggle,
   transcriptToggle,
+  roomControls,
   uiLang,
 }: CallControlsProps) {
   const t = uiText(uiLang);
@@ -160,6 +174,56 @@ export function CallControls({
               <CaptionsOff className="w-5 h-5" />
             )}
           </button>
+        )}
+        {roomControls && (
+          <>
+            <button
+              type="button"
+              onClick={roomControls.onToggleApproval}
+              className={cn(
+                "p-2 rounded-lg transition-colors cursor-pointer hover:bg-white/10",
+                roomControls.approvalRequired
+                  ? "text-emerald-400 hover:text-emerald-300"
+                  : "text-white/50 hover:text-white",
+              )}
+              title={
+                roomControls.approvalRequired
+                  ? "Entrada com autorização (clique para deixar entrar direto)"
+                  : "Entrada direta (clique para exigir autorização)"
+              }
+              aria-label="Entrada com autorização"
+              aria-pressed={roomControls.approvalRequired}
+            >
+              {roomControls.approvalRequired ? (
+                <ShieldCheck className="w-5 h-5" />
+              ) : (
+                <DoorOpen className="w-5 h-5" />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={roomControls.onToggleLock}
+              className={cn(
+                "p-2 rounded-lg transition-colors cursor-pointer hover:bg-white/10",
+                roomControls.locked
+                  ? "text-amber-400 hover:text-amber-300"
+                  : "text-white/50 hover:text-white",
+              )}
+              title={
+                roomControls.locked
+                  ? "Sala trancada: ninguém novo entra (clique para destrancar)"
+                  : "Trancar sala: o convite para de funcionar para quem ainda não entrou"
+              }
+              aria-label="Trancar sala"
+              aria-pressed={roomControls.locked}
+            >
+              {roomControls.locked ? (
+                <Lock className="w-5 h-5" />
+              ) : (
+                <LockOpen className="w-5 h-5" />
+              )}
+            </button>
+          </>
         )}
         {transcriptToggle && (
           <button

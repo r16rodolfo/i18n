@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Hourglass, Loader2 } from "lucide-react";
 
+import type { EntryMode } from "@/db/schema";
 import type { LanguageCode } from "@/lib/languages";
 import type { TranslationProvider } from "@/lib/translation-providers";
 import { languageName, type UiLang, uiText } from "@/lib/ui-text";
@@ -45,8 +46,11 @@ export function RoomClient({
     token: string;
     translationProvider: TranslationProvider;
     invitePath: string | null;
+    roomSettings: { locked: boolean; entryMode: EntryMode } | null;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Waiting room: the ticket while a team member decides
+  const [waitingRequestId, setWaitingRequestId] = useState<string | null>(null);
 
   // Load name and language preferences from localStorage on mount
   useEffect(() => {
@@ -71,43 +75,74 @@ export function RoomClient({
     }
   };
 
+  // Asks to get in. Guests of an "approval" room get a waiting ticket
+  // first (202) and ask again with it until they are let in or refused.
+  const requestEntry = useCallback(
+    async (requestId: string | null) => {
+      if (!visitorId || !username.trim()) return;
+
+      try {
+        const res = await fetch(`/api/rooms/${roomId}/join`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            visitorId,
+            username: username.trim(),
+            preferredLanguage,
+            inviteToken,
+            requestId,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (res.status === 202) {
+          setWaitingRequestId(data.requestId);
+          return;
+        }
+        setWaitingRequestId(null);
+        if (!res.ok) {
+          throw new Error(
+            data.reason === "locked"
+              ? t.roomLocked
+              : data.reason === "denied"
+                ? t.entryDenied
+                : res.status === 403
+                  ? t.invalidLink
+                  : t.joinFailed,
+          );
+        }
+
+        setJoined({
+          roomUrl: data.roomUrl,
+          token: data.token,
+          translationProvider: data.translationProvider ?? "none",
+          invitePath: data.invitePath ?? null,
+          roomSettings: data.roomSettings ?? null,
+        });
+      } catch (err) {
+        setWaitingRequestId(null);
+        setError(err instanceof Error ? err.message : t.joinFailed);
+      }
+    },
+    [visitorId, username, roomId, preferredLanguage, inviteToken, t],
+  );
+
   const handleJoin = async () => {
     if (!visitorId || !username.trim()) return;
 
     setIsJoining(true);
     setError(null);
     remember("username", username.trim());
-
-    try {
-      const res = await fetch(`/api/rooms/${roomId}/join`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          visitorId,
-          username: username.trim(),
-          preferredLanguage,
-          inviteToken,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(res.status === 403 ? t.invalidLink : t.joinFailed);
-      }
-
-      setJoined({
-        roomUrl: data.roomUrl,
-        token: data.token,
-        translationProvider: data.translationProvider ?? "none",
-        invitePath: data.invitePath ?? null,
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.joinFailed);
-    } finally {
-      setIsJoining(false);
-    }
+    await requestEntry(null);
+    setIsJoining(false);
   };
+
+  // While waiting, check every 2 s whether a team member decided
+  useEffect(() => {
+    if (!waitingRequestId) return;
+    const timer = setInterval(() => requestEntry(waitingRequestId), 2000);
+    return () => clearInterval(timer);
+  }, [waitingRequestId, requestEntry]);
 
   // Show video call when joined
   if (joined && visitorId) {
@@ -124,7 +159,28 @@ export function RoomClient({
         inviteToken={inviteToken}
         isTeamMember={isTeamMember}
         invitePath={joined.invitePath}
+        roomSettings={joined.roomSettings}
       />
+    );
+  }
+
+  // Waiting room
+  if (waitingRequestId) {
+    return (
+      <div className="min-h-screen bg-neutral-100 flex items-center justify-center p-8">
+        <div className="max-w-md text-center space-y-4">
+          <Hourglass className="w-8 h-8 text-neutral-500 mx-auto animate-pulse" />
+          <h1 className="text-2xl font-light text-black">{t.waitingTitle}</h1>
+          <p className="text-neutral-600">{t.waitingText}</p>
+          <Button
+            variant="outline"
+            onClick={() => setWaitingRequestId(null)}
+            className="cursor-pointer"
+          >
+            {t.waitingCancel}
+          </Button>
+        </div>
+      </div>
     );
   }
 

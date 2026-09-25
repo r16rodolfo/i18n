@@ -1,3 +1,4 @@
+import type { EntryMode } from "@/db/schema";
 import type { LanguageCode } from "@/lib/languages";
 import type { TranslationProvider } from "@/lib/translation-providers";
 
@@ -15,6 +16,13 @@ export interface VideoCallProps {
   isTeamMember: boolean;
   // Guest link to share (team members only)
   invitePath: string | null;
+  // Lock and entry mode of the room (team members only)
+  roomSettings: RoomSettings | null;
+}
+
+export interface RoomSettings {
+  locked: boolean;
+  entryMode: EntryMode;
 }
 
 export interface TranscriptEntry {

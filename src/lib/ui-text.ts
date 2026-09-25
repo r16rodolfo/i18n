@@ -56,6 +56,12 @@ const TEXT = {
     summary: (speak: string, hear: string) =>
       `Você vai falar em ${speak} e ouvir os outros em ${hear}`,
     joinFailed: "Não foi possível entrar na chamada",
+    waitingTitle: "Aguardando o anfitrião",
+    waitingText:
+      "Avisamos a equipe que você quer entrar. Mantenha esta página aberta.",
+    waitingCancel: "Desistir",
+    entryDenied: "O anfitrião não autorizou a sua entrada.",
+    roomLocked: "Esta reunião não aceita mais entradas.",
     invalidLink: "Este link não é válido ou a reunião já terminou.",
     joiningCall: "Entrando na chamada...",
     hearingIn: (language: string) => `Ouvindo em ${language}`,
@@ -106,6 +112,12 @@ const TEXT = {
     summary: (speak: string, hear: string) =>
       `Vas a hablar en ${speak} y escuchar a los demás en ${hear}`,
     joinFailed: "No fue posible unirse a la llamada",
+    waitingTitle: "Esperando al anfitrión",
+    waitingText:
+      "Avisamos al equipo que quieres entrar. Mantén esta página abierta.",
+    waitingCancel: "Cancelar",
+    entryDenied: "El anfitrión no autorizó tu entrada.",
+    roomLocked: "Esta reunión ya no acepta nuevas entradas.",
     invalidLink: "Este enlace no es válido o la reunión ya terminó.",
     joiningCall: "Entrando a la llamada...",
     hearingIn: (language: string) => `Escuchando en ${language}`,

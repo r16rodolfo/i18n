@@ -44,6 +44,11 @@ export const appSettings = pgTable("app_settings", {
   }),
 }).enableRLS();
 
+// How guests get into a room: straight in with the invite link ("open"), or
+// only after someone from the team lets them in ("approval", the default)
+export const ENTRY_MODES = ["open", "approval"] as const;
+export type EntryMode = (typeof ENTRY_MODES)[number];
+
 export const rooms = pgTable(
   "rooms",
   {
@@ -57,12 +62,58 @@ export const rooms = pgTable(
     // Secret part of the guest link (/{room}?convite=...). Guests can only
     // join with it, and only until the room expires.
     inviteToken: text("invite_token"),
+    entryMode: text("entry_mode")
+      .$type<EntryMode>()
+      .notNull()
+      .default("approval"),
+    // Locked rooms take no new guests (the invite link stops working);
+    // whoever is already in the call stays
+    lockedAt: timestamp("locked_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     expiresAt: timestamp("expires_at"),
   },
   (table) => [
     unique("rooms_daily_room_name_unique").on(table.dailyRoomName),
     index("rooms_created_by_idx").on(table.createdBy),
+    check(
+      "rooms_entry_mode_check",
+      sql`${table.entryMode} in ('open', 'approval')`,
+    ),
+  ],
+).enableRLS();
+
+// Guests asking to get into a room in "approval" mode (waiting room)
+export const JOIN_REQUEST_STATUSES = ["pending", "approved", "denied"] as const;
+export type JoinRequestStatus = (typeof JOIN_REQUEST_STATUSES)[number];
+
+export const joinRequests = pgTable(
+  "join_requests",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    roomId: uuid("room_id")
+      .notNull()
+      .references(() => rooms.id, { onDelete: "cascade" }),
+    visitorId: text("visitor_id").notNull(),
+    username: text("username").notNull(),
+    preferredLanguage: text("preferred_language").notNull(),
+    status: text("status")
+      .$type<JoinRequestStatus>()
+      .notNull()
+      .default("pending"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    // The guest's page asks every few seconds; stale requests are hidden
+    lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
+    decidedAt: timestamp("decided_at"),
+    decidedBy: uuid("decided_by").references(() => authUsers.id, {
+      onDelete: "set null",
+    }),
+  },
+  (table) => [
+    index("join_requests_room_id_status_idx").on(table.roomId, table.status),
+    check(
+      "join_requests_status_check",
+      sql`${table.status} in ('pending', 'approved', 'denied')`,
+    ),
   ],
 ).enableRLS();
 
@@ -132,4 +183,5 @@ export type NewRoom = typeof rooms.$inferInsert;
 export type Participant = typeof participants.$inferSelect;
 export type NewParticipant = typeof participants.$inferInsert;
 export type Transcript = typeof transcripts.$inferSelect;
+export type JoinRequest = typeof joinRequests.$inferSelect;
 export type NewTranscript = typeof transcripts.$inferInsert;

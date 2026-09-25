@@ -80,6 +80,20 @@ All documented in `.env.example` (copy to `.env.local`). Key rules:
 - Guest screens are in Spanish, team screens in Portuguese
   (`src/lib/ui-text.ts` for screens both can see).
 
+### Room lock and waiting room
+- `rooms.locked_at`: a locked room takes no NEW guests (join route answers
+  423, the invite page says so); people already in the call keep working
+  (captions etc. still use `getRoomAccess`, which ignores the lock on
+  purpose). Team members always get in.
+- `rooms.entry_mode`: `approval` (default for new rooms) or `open`. In
+  `approval`, the guest's join gets a waiting ticket (202 + `requestId`,
+  row in `join_requests`) and the guest page asks again every 2 s; team
+  members in the call poll `GET /api/rooms/[roomId]/join-requests` every
+  3 s (requests not seen for 15 s are hidden) and decide with
+  `POST .../join-requests/[requestId]`. Lock/mode are changed with
+  `POST /api/rooms/[roomId]/settings` from the dashboard or the call
+  (team only, `src/lib/team-room.ts`).
+
 ### Flow
 1. Team member clicks "Nova reunião" on `/` → `POST /api/rooms` (team only)
    creates a **private** Daily room (no entry without a meeting token) and a

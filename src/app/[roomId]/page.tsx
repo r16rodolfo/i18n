@@ -40,6 +40,26 @@ export default async function RoomPage({
     );
   }
 
+  // Locked: the team closed the room to new guests
+  if (!access.member && access.room.lockedAt) {
+    return (
+      <div className="min-h-screen bg-neutral-100 flex items-center justify-center p-8">
+        <div className="max-w-md text-center space-y-3">
+          <h1 className="text-2xl font-light text-black">
+            Esta reunión ya no acepta nuevas entradas
+          </h1>
+          <p className="text-neutral-600">
+            Si crees que es un error, habla con quien te invitó.
+          </p>
+          <p className="text-sm text-neutral-500 pt-4">
+            Esta reunião não aceita mais entradas. Se achar que é um engano,
+            fale com quem te convidou.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <RoomClient
       roomId={roomId}

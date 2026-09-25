@@ -18,6 +18,7 @@ import { EmailConfirmDialog } from "./email-confirm-dialog";
 import { liveTranscriptOf, useCaptions } from "./hooks/use-captions";
 import { useFloor } from "./hooks/use-floor";
 import { useIntentDetection } from "./hooks/use-intent-detection";
+import { useRoomEntry } from "./hooks/use-room-entry";
 import { useScribe } from "./hooks/use-scribe";
 import { useSoniox } from "./hooks/use-soniox";
 import { useTranscription } from "./hooks/use-transcription";
@@ -25,6 +26,7 @@ import { ParticipantTile } from "./participant-tile";
 import { ShareModal } from "./share-modal";
 import { TranscriptSidebar } from "./transcript-sidebar";
 import type { VideoCallProps } from "./types";
+import { WaitingGuests } from "./waiting-guests";
 
 // Silence (in ms) after which whoever has the floor gives it back
 const FLOOR_AUTO_RELEASE_MS = 8000;
@@ -41,6 +43,7 @@ export function CallUI({
   inviteToken,
   isTeamMember,
   invitePath,
+  roomSettings,
 }: VideoCallProps) {
   const uiLang = uiLangFor(spokenLanguage);
   const t = uiText(uiLang);
@@ -164,6 +167,13 @@ export function CallUI({
   const callLiveTranscript = liveCaptions
     ? liveTranscriptOf(captions.live)
     : liveTranscript;
+
+  // Team only: lock/entry mode of the room and guests waiting to get in
+  const roomEntry = useRoomEntry(
+    roomId,
+    roomSettings,
+    isTeamMember && !isJoining,
+  );
 
   // Proactive intent detection for email actions (team only: the agent
   // routes spend OpenAI credits and can send e-mail)
@@ -348,6 +358,13 @@ export function CallUI({
             ))}
           </div>
 
+          {isTeamMember && (
+            <WaitingGuests
+              guests={roomEntry.waiting}
+              onDecide={roomEntry.decide}
+            />
+          )}
+
           {liveCaptions && (
             <CaptionsBar
               caption={showCaptions ? captions.live : null}
@@ -401,6 +418,25 @@ export function CallUI({
                   : (floor.holder?.name ?? null),
                 onTake: floor.take,
                 onRelease: floor.release,
+              }
+            : undefined
+        }
+        roomControls={
+          isTeamMember && roomEntry.settings
+            ? {
+                locked: roomEntry.settings.locked,
+                approvalRequired: roomEntry.settings.entryMode === "approval",
+                onToggleLock: () =>
+                  roomEntry.updateSettings({
+                    locked: !roomEntry.settings?.locked,
+                  }),
+                onToggleApproval: () =>
+                  roomEntry.updateSettings({
+                    entryMode:
+                      roomEntry.settings?.entryMode === "approval"
+                        ? "open"
+                        : "approval",
+                  }),
               }
             : undefined
         }
