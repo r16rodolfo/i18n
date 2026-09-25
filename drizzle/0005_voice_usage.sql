@@ -1,0 +1,2 @@
+ALTER TABLE "usage_events" DROP CONSTRAINT "usage_events_service_check";--> statement-breakpoint
+ALTER TABLE "usage_events" ADD CONSTRAINT "usage_events_service_check" CHECK (service in ('video', 'stt_soniox', 'stt_elevenlabs', 'palabra', 'translation_openai', 'assistant_openai', 'web_search', 'tts_soniox', 'tts_elevenlabs', 'voice_openai'));

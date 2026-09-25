@@ -15,6 +15,8 @@ import {
   ShieldCheck,
   Video,
   VideoOff,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 
 import { getLanguageFlag, type LanguageCode } from "@/lib/languages";
@@ -30,6 +32,15 @@ export interface FloorControls {
   otherHolderName: string | null;
   onTake: () => void;
   onRelease: () => void;
+  // The translated voice of the last speaker is still playing for you:
+  // wait before talking, or you would talk over it
+  waitForVoice?: boolean;
+}
+
+// Hear the others in your language (translated voice), each person decides
+export interface VoiceToggle {
+  enabled: boolean;
+  onToggle: () => void;
 }
 
 // Show/hide the captions under the video (each person decides for themselves)
@@ -70,6 +81,7 @@ interface CallControlsProps {
   floor?: FloorControls;
   floorToggle?: FloorToggle;
   captionsToggle?: CaptionsToggle;
+  voiceToggle?: VoiceToggle;
   transcriptToggle?: TranscriptToggle;
   roomControls?: RoomControls;
   uiLang: UiLang;
@@ -86,6 +98,7 @@ export function CallControls({
   floor,
   floorToggle,
   captionsToggle,
+  voiceToggle,
   transcriptToggle,
   roomControls,
   uiLang,
@@ -172,6 +185,27 @@ export function CallControls({
               <Captions className="w-5 h-5" />
             ) : (
               <CaptionsOff className="w-5 h-5" />
+            )}
+          </button>
+        )}
+        {voiceToggle && (
+          <button
+            type="button"
+            onClick={voiceToggle.onToggle}
+            className={cn(
+              "p-2 rounded-lg transition-colors cursor-pointer hover:bg-white/10",
+              voiceToggle.enabled
+                ? "text-white hover:text-white"
+                : "text-white/50 hover:text-white",
+            )}
+            title={voiceToggle.enabled ? t.voiceOn : t.voiceOff}
+            aria-label={voiceToggle.enabled ? t.voiceOn : t.voiceOff}
+            aria-pressed={voiceToggle.enabled}
+          >
+            {voiceToggle.enabled ? (
+              <Volume2 className="w-5 h-5" />
+            ) : (
+              <VolumeX className="w-5 h-5" />
             )}
           </button>
         )}
@@ -308,6 +342,19 @@ function FloorButton({
       >
         <MicOff className="w-5 h-5 shrink-0" />
         <span className="truncate">{t.floorBusy(floor.otherHolderName)}</span>
+      </Button>
+    );
+  }
+
+  if (floor.waitForVoice) {
+    return (
+      <Button
+        variant="secondary"
+        disabled
+        className="h-12 rounded-full px-6 gap-2 text-base"
+      >
+        <Volume2 className="w-5 h-5 shrink-0 animate-pulse" />
+        {t.floorWaitVoice}
       </Button>
     );
   }

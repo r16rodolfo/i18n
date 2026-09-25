@@ -94,6 +94,27 @@ All documented in `.env.example` (copy to `.env.local`). Key rules:
   `POST /api/rooms/[roomId]/settings` from the dashboard or the call
   (team only, `src/lib/team-room.ts`).
 
+### Translated voice
+- `src/lib/voice-engines.ts` (server) + `voice-options.ts` (client-safe
+  constants): `none | soniox | elevenlabs | openai`, chosen in /admin
+  (`app_settings` key `voice_engine`, checked with a free token call before
+  saving; `DEV_VOICE_ENGINE` overrides locally). Only active with the
+  Soniox or ElevenLabs captions providers (`getActiveVoiceEngine`).
+- Soniox/ElevenLabs: each speaker picks female/male at join (sent as
+  `voice` in the "final" caption message). The listener's
+  `use-tts-voice.ts` gets pieces translated into its language from
+  `use-captions` (`onVoicePiece`) and asks `POST /api/rooms/[roomId]/voice`
+  (server calls the TTS with the real key, streams PCM s16le 24 kHz back,
+  records cost). Pieces play in order; waiting pieces are read faster
+  (1.12/1.25) and more than 4 waiting are dropped.
+- OpenAI: `openai-voice.tsx` opens one gpt-realtime-translate WebRTC
+  session per remote participant who reads another language, sending
+  their Daily audio track; secret from `POST .../voice-session`. Session
+  time is reported by the usage meter.
+- While the voice is on, the original audio of other-language participants
+  plays at 15 %, and "Falar" shows "Aguarde a tradução" while the voice
+  is playing. Each person toggles the voice (Volume icon, remembered).
+
 ### Cost tracking (estimates)
 - `usage_events` (one row per measured use; `room_id` is set null when a
   room is deleted, `room_name` stays) + prices in `src/lib/usage-pricing.ts`

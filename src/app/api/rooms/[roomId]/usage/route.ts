@@ -5,9 +5,10 @@ import { getTeamRoom } from "@/lib/team-room";
 import { getRoomUsage, recordUsage, type UsageRecord } from "@/lib/usage";
 import { timeCost } from "@/lib/usage-pricing";
 
-// How long each person spent in the call, and how long their mic was being
-// transcribed, reported by their browser about once a minute (and when they
-// leave). Used only to estimate the meeting's cost.
+// How long each person spent in the call, how long their mic was being
+// transcribed and how long their OpenAI voice sessions were open, reported
+// by their browser about once a minute (and when they leave). Used only to
+// estimate the meeting's cost.
 
 // A report covers at most this much time (the browser reports every 60 s)
 const MAX_SECONDS = 120;
@@ -25,6 +26,13 @@ const ReportSchema = z.object({
   // Seconds the translation engine was listening to this person
   engine: z.enum(["soniox", "elevenlabs", "palabra"]).nullish(),
   engineSeconds: z.number().min(0).max(MAX_SECONDS).default(0),
+  // OpenAI voice: seconds summed over the sessions (one per person heard
+  // in translation, so up to a few per report)
+  voiceSeconds: z
+    .number()
+    .min(0)
+    .max(MAX_SECONDS * 5)
+    .default(0),
 });
 
 export async function POST(
@@ -63,6 +71,16 @@ export async function POST(
       service,
       quantity: seconds,
       costUsd: timeCost(service, seconds),
+      visitorId: report.visitorId,
+    });
+  }
+  if (report.voiceSeconds > 0) {
+    records.push({
+      roomName: room.dailyRoomName,
+      roomId: room.id,
+      service: "voice_openai",
+      quantity: report.voiceSeconds,
+      costUsd: timeCost("voice_openai", report.voiceSeconds),
       visitorId: report.visitorId,
     });
   }

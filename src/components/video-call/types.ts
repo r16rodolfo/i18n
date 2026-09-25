@@ -1,6 +1,7 @@
 import type { EntryMode } from "@/db/schema";
 import type { LanguageCode } from "@/lib/languages";
 import type { TranslationProvider } from "@/lib/translation-providers";
+import type { VoiceEngine, VoiceGender } from "@/lib/voice-options";
 
 export interface VideoCallProps {
   roomUrl: string;
@@ -11,6 +12,9 @@ export interface VideoCallProps {
   visitorId: string;
   roomId: string;
   translationProvider: TranslationProvider;
+  // Translated voice engine of the meeting, and the voice you picked
+  voiceEngine: VoiceEngine;
+  voiceGender: VoiceGender;
   // Guests: the invite token from their link. Team members: null.
   inviteToken: string | null;
   isTeamMember: boolean;

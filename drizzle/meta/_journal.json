@@ -36,6 +36,13 @@
       "when": 1790303623945,
       "tag": "0004_usage_events",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790305159199,
+      "tag": "0005_voice_usage",
+      "breakpoints": true
     }
   ]
 }

@@ -12,11 +12,14 @@ export const USAGE_SERVICES = [
   "translation_openai",
   "assistant_openai",
   "web_search",
+  "tts_soniox",
+  "tts_elevenlabs",
+  "voice_openai",
 ] as const;
 export type UsageService = (typeof USAGE_SERVICES)[number];
 
 // How each service is measured
-export type UsageUnit = "seconds" | "tokens" | "calls";
+export type UsageUnit = "seconds" | "tokens" | "calls" | "characters";
 
 export const USAGE_SERVICE_INFO: Record<
   UsageService,
@@ -29,6 +32,9 @@ export const USAGE_SERVICE_INFO: Record<
   translation_openai: { label: "Tradução do texto (OpenAI)", unit: "tokens" },
   assistant_openai: { label: "Assistente de IA (OpenAI)", unit: "tokens" },
   web_search: { label: "Busca na web do assistente (Exa)", unit: "calls" },
+  tts_soniox: { label: "Voz traduzida (Soniox)", unit: "seconds" },
+  tts_elevenlabs: { label: "Voz traduzida (ElevenLabs)", unit: "characters" },
+  voice_openai: { label: "Voz traduzida (OpenAI)", unit: "seconds" },
 };
 
 // Services charged by time, in dollars per second of use.
@@ -42,6 +48,15 @@ const PER_SECOND: Partial<Record<UsageService, number | null>> = {
   // Scribe v2 Realtime: $0.39 per hour
   stt_elevenlabs: 0.39 / 3600,
   palabra: null,
+  // Seconds of speech generated: about $0.70 per hour
+  tts_soniox: 0.7 / 3600,
+  // gpt-realtime-translate: $0.034 per minute, per listener
+  voice_openai: 0.034 / 60,
+};
+
+// ElevenLabs Flash: $0.05 per 1,000 characters read
+const PER_CHARACTER: Partial<Record<UsageService, number>> = {
+  tts_elevenlabs: 0.05 / 1000,
 };
 
 export const DAILY_FREE_MINUTES = 10_000;
@@ -64,6 +79,11 @@ const OPENAI_MODELS: Record<
 export function timeCost(service: UsageService, seconds: number) {
   const price = PER_SECOND[service];
   return price == null ? null : seconds * price;
+}
+
+export function characterCost(service: UsageService, characters: number) {
+  const price = PER_CHARACTER[service];
+  return price == null ? null : characters * price;
 }
 
 export function callCost(service: UsageService, calls: number) {
@@ -121,6 +141,9 @@ export function formatQuantity(service: UsageService, quantity: number) {
   if (unit === "seconds") return formatDuration(quantity);
   if (unit === "calls") {
     return `${quantity} ${quantity === 1 ? "busca" : "buscas"}`;
+  }
+  if (unit === "characters") {
+    return `${Math.round(quantity).toLocaleString("pt-BR")} letras`;
   }
   return `${Math.round(quantity).toLocaleString("pt-BR")} tokens`;
 }
