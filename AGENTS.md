@@ -94,6 +94,26 @@ All documented in `.env.example` (copy to `.env.local`). Key rules:
   `POST /api/rooms/[roomId]/settings` from the dashboard or the call
   (team only, `src/lib/team-room.ts`).
 
+### Cost tracking (estimates)
+- `usage_events` (one row per measured use; `room_id` is set null when a
+  room is deleted, `room_name` stays) + prices in `src/lib/usage-pricing.ts`
+  (list prices in USD; the cost is computed and saved when the row is
+  written, so price changes don't rewrite history). `src/lib/usage.ts`
+  saves (`recordUsage`, never throws) and sums (by room, by month in
+  Brazil time).
+- What is measured: each browser reports every 60 s and on leave
+  (`use-usage-meter.ts` -> `POST /api/rooms/[roomId]/usage`, max 120 s per
+  report) its call time (Daily participant-minutes) and how long the
+  translation engine listened to it (Soniox/ElevenLabs while the mic is
+  open, Palabra while active; Palabra has no price on file). The server
+  records OpenAI tokens of caption translation (captions route, priority
+  tier = 2x) and of the assistant (agent/intent/actions routes, plus Exa
+  web searches at ~$0.01).
+- Shown: team-only badge in the call (`GET .../usage`, every 30 s), "Custo
+  até agora" per room on the dashboard, `/custos` (month totals + each
+  meeting) and the month total in `/admin`. A new service needs a new
+  value in `USAGE_SERVICES` AND a migration for the check constraint.
+
 ### Flow
 1. Team member clicks "Nova reunião" on `/` → `POST /api/rooms` (team only)
    creates a **private** Daily room (no entry without a meeting token) and a

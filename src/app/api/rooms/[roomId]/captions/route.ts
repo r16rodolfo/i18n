@@ -7,6 +7,7 @@ import { translateCaption } from "@/lib/caption-translation";
 import { isValidLanguageCode, type LanguageCode } from "@/lib/languages";
 import { getRoomAccess } from "@/lib/room-access";
 import { getActiveTranslationProvider } from "@/lib/translation-providers";
+import { recordUsage } from "@/lib/usage";
 
 // A piece of speech from the speaker's browser, saved in the meeting
 // transcript (after answering, so the database never slows captions down).
@@ -69,6 +70,7 @@ export async function POST(
   ) as LanguageCode[];
 
   // One failed language must not lose the others (or the original)
+  const spent = { inputTokens: 0, outputTokens: 0, costUsd: 0 };
   const results = await Promise.all(
     targets.map(async (to) => {
       if (provider === "soniox") {
@@ -76,13 +78,16 @@ export async function POST(
         return text ? ([to, text] as const) : null;
       }
       try {
-        const text = await translateCaption({
+        const result = await translateCaption({
           text: caption.text,
           from,
           to,
           context: caption.context,
         });
-        return text ? ([to, text] as const) : null;
+        spent.inputTokens += result.inputTokens;
+        spent.outputTokens += result.outputTokens;
+        spent.costUsd += result.costUsd ?? 0;
+        return result.text ? ([to, result.text] as const) : null;
       } catch (error) {
         console.error(`[captions] translation to ${to} failed:`, error);
         return null;
@@ -111,6 +116,20 @@ export async function POST(
       // The captions still work without the saved transcript
       console.error("[captions] failed to save transcript:", error);
     }
+    await recordUsage([
+      {
+        roomName: room.dailyRoomName,
+        roomId: room.id,
+        service: "translation_openai",
+        quantity: spent.inputTokens + spent.outputTokens,
+        costUsd: spent.costUsd,
+        visitorId: caption.visitorId,
+        detail: {
+          inputTokens: spent.inputTokens,
+          outputTokens: spent.outputTokens,
+        },
+      },
+    ]);
   });
 
   return Response.json({ translations });

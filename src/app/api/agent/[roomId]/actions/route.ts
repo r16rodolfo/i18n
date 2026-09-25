@@ -1,8 +1,10 @@
+import { after } from "next/server";
+
 import { generateObject } from "ai";
 import { z } from "zod";
 
 import { ActionsRequestSchema } from "@/lib/agent-schemas";
-import { chatModel } from "@/lib/ai";
+import { chatModel, recordAssistantUsage } from "@/lib/ai";
 import { getTeamMember, unauthorized } from "@/lib/auth";
 
 const ActionItemSchema = z.object({
@@ -68,6 +70,8 @@ Provide a brief meeting summary (2-3 sentences).
 Prioritize actions based on urgency mentioned in the conversation.`,
       temperature: 0.3,
     });
+
+    after(() => recordAssistantUsage(roomId, result.usage));
 
     return Response.json(result.object);
   } catch (error) {

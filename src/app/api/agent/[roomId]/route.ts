@@ -6,7 +6,7 @@ import {
 } from "ai";
 
 import { ChatRequestSchema } from "@/lib/agent-schemas";
-import { chatModel } from "@/lib/ai";
+import { chatModel, recordAssistantUsage } from "@/lib/ai";
 import { webSearchTool } from "@/tools/web-search";
 import { getTeamMember, unauthorized } from "@/lib/auth";
 
@@ -90,6 +90,14 @@ Guidelines:
       },
       stopWhen: stepCountIs(5),
       temperature: 0.3,
+      onFinish: ({ totalUsage, steps }) =>
+        recordAssistantUsage(
+          roomId,
+          totalUsage,
+          steps
+            .flatMap((step) => step.toolCalls)
+            .filter((call) => call.toolName === "webSearch").length,
+        ),
     });
 
     return result.toUIMessageStreamResponse();

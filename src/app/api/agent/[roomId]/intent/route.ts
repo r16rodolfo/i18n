@@ -1,8 +1,10 @@
+import { after } from "next/server";
+
 import { generateObject } from "ai";
 import { z } from "zod";
 
 import { ActionsRequestSchema, EmailActionSchema } from "@/lib/agent-schemas";
-import { chatModel } from "@/lib/ai";
+import { chatModel, recordAssistantUsage } from "@/lib/ai";
 import { getTeamMember, unauthorized } from "@/lib/auth";
 
 const IntentDetectionSchema = z.object({
@@ -20,7 +22,7 @@ export async function POST(
   if (!(await getTeamMember())) return unauthorized();
 
   try {
-    await params;
+    const { roomId } = await params;
     const body = await req.json();
 
     const validatedRequest = ActionsRequestSchema.parse(body);
@@ -71,6 +73,8 @@ If hasEmailIntent is true, generate a complete email action with:
 - For recipients, only use email addresses explicitly said in the transcript; otherwise leave the list empty (the user fills them in before sending)`,
       temperature: 0.2,
     });
+
+    after(() => recordAssistantUsage(roomId, result.usage));
 
     return Response.json(result.object);
   } catch (error) {
