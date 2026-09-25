@@ -187,6 +187,7 @@ export function CallUI({
     inviteToken,
     language: spokenLanguage,
     getTargetLanguage: captions.getTargetLanguage,
+    targetLanguage: captions.targetLanguage,
     onPartial: captions.showPartial,
     onPiece: captions.publishTranslatedPiece,
   });

@@ -252,6 +252,12 @@ export function RoomClient({
                 onChange={(lang) => {
                   setSpokenLanguage(lang);
                   remember("spokenLanguage", lang);
+                  // Almost everyone hears in the language they speak: keep
+                  // both together unless they were set apart on purpose
+                  if (preferredLanguage === spokenLanguage) {
+                    setPreferredLanguage(lang);
+                    remember("preferredLanguage", lang);
+                  }
                 }}
                 disabled={isJoining}
                 uiLang={uiLang}

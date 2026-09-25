@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { DailyCall } from "@daily-co/daily-js";
 import { useDailyEvent } from "@daily-co/daily-react";
@@ -91,6 +91,22 @@ export interface CaptionLine {
 }
 
 // A piece translated into your language, to be read aloud
+// The language most of the others read, if it isn't the one you speak
+function pickTarget(
+  languages: Iterable<LanguageCode>,
+  spokenLanguage: LanguageCode,
+): LanguageCode | null {
+  const counts = new Map<LanguageCode, number>();
+  for (const lang of languages) {
+    if (lang !== spokenLanguage) counts.set(lang, (counts.get(lang) ?? 0) + 1);
+  }
+  let best: LanguageCode | null = null;
+  for (const [lang, count] of counts) {
+    if (!best || count > (counts.get(best) ?? 0)) best = lang;
+  }
+  return best;
+}
+
 export interface VoicePiece {
   id: string;
   // Daily session id of the speaker
@@ -147,9 +163,7 @@ export function useCaptions({
   const languagesRef = useRef<Map<string, LanguageCode>>(new Map());
   // The same, for rendering (e.g. lowering the original voice of people
   // who speak another language)
-  const [languages, setLanguages] = useState<Record<string, LanguageCode>>(
-    {},
-  );
+  const [languages, setLanguages] = useState<Record<string, LanguageCode>>({});
   const syncLanguages = useCallback(() => {
     setLanguages(Object.fromEntries(languagesRef.current));
   }, []);
@@ -375,19 +389,18 @@ export function useCaptions({
     [emitPiece],
   );
 
-  // The language most of the others read, if it isn't the one you speak
-  const getTargetLanguage = useCallback((): LanguageCode | null => {
-    const counts = new Map<LanguageCode, number>();
-    for (const lang of languagesRef.current.values()) {
-      if (lang !== spokenLanguage)
-        counts.set(lang, (counts.get(lang) ?? 0) + 1);
-    }
-    let best: LanguageCode | null = null;
-    for (const [lang, count] of counts) {
-      if (!best || count > (counts.get(best) ?? 0)) best = lang;
-    }
-    return best;
-  }, [spokenLanguage]);
+  // The language most of the others read, if it isn't the one you speak:
+  // read when you start talking, and watched (targetLanguage) to follow
+  // people who join or change language while you talk
+  const getTargetLanguage = useCallback(
+    (): LanguageCode | null =>
+      pickTarget(languagesRef.current.values(), spokenLanguage),
+    [spokenLanguage],
+  );
+  const targetLanguage = useMemo(
+    () => pickTarget(Object.values(languages), spokenLanguage),
+    [languages, spokenLanguage],
+  );
 
   useDailyEvent(
     "app-message",
@@ -522,13 +535,16 @@ export function useCaptions({
   // People who leave no longer need translations
   useDailyEvent(
     "participant-left",
-    useCallback((event) => {
-      const left = event?.participant?.session_id;
-      if (left) {
-        languagesRef.current.delete(left);
-        syncLanguages();
-      }
-    }, [syncLanguages]),
+    useCallback(
+      (event) => {
+        const left = event?.participant?.session_id;
+        if (left) {
+          languagesRef.current.delete(left);
+          syncLanguages();
+        }
+      },
+      [syncLanguages],
+    ),
   );
 
   // Announce the language you want, and ask the others for theirs
@@ -551,6 +567,7 @@ export function useCaptions({
     showPartial,
     publishTranslatedPiece,
     getTargetLanguage,
+    targetLanguage,
   };
 }
 
