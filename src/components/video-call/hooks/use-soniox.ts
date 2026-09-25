@@ -41,11 +41,16 @@ interface UseSonioxOptions {
   language: LanguageCode;
   // The language the others read, when it differs from yours
   getTargetLanguage: () => LanguageCode | null;
+  // The same value, to notice when it changes while you are talking
+  targetLanguage?: LanguageCode | null;
   // What you are saying right now (not finished yet)
   onPartial: (text: string) => void;
   // A finished piece: your words and their translation (if any)
   onPiece: (original: string, translations: Record<string, string>) => void;
 }
+
+// Longest wait for the old connection's last words when switching language
+const SWITCH_TIMEOUT_MS = 2000;
 
 // Markers Soniox puts in the text (end of an utterance, finalization)
 const isMarker = (text: string) => text === "<end>" || text === "<fin>";
@@ -56,6 +61,7 @@ export function useSoniox({
   inviteToken,
   language,
   getTargetLanguage,
+  targetLanguage,
   onPartial,
   onPiece,
 }: UseSonioxOptions) {
@@ -365,6 +371,37 @@ export function useSoniox({
     () => Date.now() - lastVoiceAtRef.current,
     [],
   );
+
+  // Someone joined or changed language while you are talking: switch to a
+  // new connection so Soniox translates into their language from now on
+  // (the language is only set when a connection opens). The old connection
+  // first finishes the words it already heard; meanwhile your mic audio
+  // waits and goes to the new one, so nothing is lost.
+  useEffect(() => {
+    const old = wsRef.current;
+    if (!enabled || !sendingRef.current || !old) return;
+    const next =
+      targetLanguage && targetLanguage !== language ? targetLanguage : null;
+    if (next === pieceRef.current.target) return;
+
+    wsRef.current = null;
+    setStatus("connecting");
+    let switched = false;
+    const switchOver = () => {
+      if (switched) return;
+      switched = true;
+      emitPiece();
+      if (old.readyState <= WebSocket.OPEN) old.close();
+      if (sendingRef.current && !wsRef.current) connect();
+    };
+    old.addEventListener("message", (event) => {
+      if (String(event.data).includes('"finished"')) switchOver();
+    });
+    old.addEventListener("close", switchOver);
+    setTimeout(switchOver, SWITCH_TIMEOUT_MS);
+    if (old.readyState === WebSocket.OPEN) old.send("");
+    else switchOver();
+  }, [enabled, targetLanguage, language, emitPiece, connect]);
 
   // Have a key ready before the first "Falar"
   useEffect(() => {
