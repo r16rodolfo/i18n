@@ -52,14 +52,14 @@ export function useTtsVoice({
   // Soniox: open the connection as soon as the voice is on
   useEffect(() => {
     if (!useSonioxDirect) return;
-    const client = new SonioxVoiceClient(roomId, inviteToken);
+    const client = new SonioxVoiceClient(roomId, inviteToken, language);
     sonioxRef.current = client;
     client.warm();
     return () => {
       client.close();
       if (sonioxRef.current === client) sonioxRef.current = null;
     };
-  }, [useSonioxDirect, roomId, inviteToken]);
+  }, [useSonioxDirect, roomId, inviteToken, language]);
 
   // Seconds of Soniox speech received since the last call (cost estimate;
   // the ElevenLabs voice is counted by our server)
