@@ -8,10 +8,16 @@ import type { VoiceGender } from "@/lib/voice-options";
 // our server). The browser uses a temporary key limited to voice, from
 // /api/soniox/token. Each sentence is its own stream on that connection
 // (up to 5 at once), so the next one is generated while one plays.
+//
+// Soniox closes a connection ~10 s after it opens unless a sentence has
+// been spoken on it (a canceled one or keepalives don't count); after
+// that, keepalives hold it open. So each new connection first speaks a
+// tiny sentence nobody hears ("primes" it, about $0.0001).
 
 const TTS_URL = "wss://tts-rt.soniox.com/tts-websocket";
 export const SONIOX_TTS_SAMPLE_RATE = 24_000;
-const KEEPALIVE_MS = 20_000;
+const KEEPALIVE_MS = 8000;
+const PRIMING_TEXT = "Ok.";
 const CONNECT_TIMEOUT_MS = 5000;
 
 interface KeyInfo {
@@ -45,6 +51,8 @@ export class SonioxVoiceClient {
   constructor(
     private roomId: string,
     private inviteToken: string | null,
+    // The listener's language (for the priming sentence)
+    private language: string,
   ) {}
 
   // Gets the key and opens the connection before the first sentence
@@ -162,6 +170,7 @@ export class SonioxVoiceClient {
             socket.send(JSON.stringify({ keep_alive: true }));
           }
         }, KEEPALIVE_MS);
+        this.prime(socket);
         resolve(socket);
       };
       socket.onmessage = (event) => this.handleMessage(String(event.data));
@@ -186,6 +195,32 @@ export class SonioxVoiceClient {
       this.opening = null;
     });
     return this.opening;
+  }
+
+  // Speaks a tiny sentence nobody hears, so Soniox keeps the connection
+  // (its audio is ignored: the stream is not in `streams`)
+  private async prime(socket: WebSocket) {
+    const key = await this.getKey();
+    if (!key || socket.readyState !== WebSocket.OPEN) return;
+    const streamId = `prime${++this.nextId}`;
+    socket.send(
+      JSON.stringify({
+        api_key: key.apiKey,
+        model: "tts-rt-v2",
+        language: this.language,
+        voice: key.voices.female,
+        audio_format: "pcm_s16le",
+        sample_rate: SONIOX_TTS_SAMPLE_RATE,
+        stream_id: streamId,
+      }),
+    );
+    socket.send(
+      JSON.stringify({
+        text: PRIMING_TEXT,
+        text_end: true,
+        stream_id: streamId,
+      }),
+    );
   }
 
   private handleMessage(data: string) {
