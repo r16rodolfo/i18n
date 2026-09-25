@@ -20,7 +20,7 @@ export interface SpeechStream {
   done: Promise<{ audioBytes: number }>;
 }
 
-const SONIOX_VOICES: Record<VoiceGender, string> = {
+export const SONIOX_VOICES: Record<VoiceGender, string> = {
   female: process.env.SONIOX_VOICE_FEMALE || "Maya",
   male: process.env.SONIOX_VOICE_MALE || "Adrian",
 };

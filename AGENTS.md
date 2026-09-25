@@ -105,8 +105,17 @@ All documented in `.env.example` (copy to `.env.local`). Key rules:
   `use-tts-voice.ts` gets pieces translated into its language from
   `use-captions` (`onVoicePiece`) and asks `POST /api/rooms/[roomId]/voice`
   (server calls the TTS with the real key, streams PCM s16le 24 kHz back,
-  records cost). Pieces play in order; waiting pieces are read faster
-  (1.12/1.25) and more than 4 waiting are dropped.
+  records cost) for ElevenLabs. Soniox goes straight from the browser
+  (`soniox-voice-client.ts`): one TTS WebSocket kept open for the call
+  (keepalive, reopened when Soniox drops it), a 30-min reusable temporary
+  key (`POST /api/soniox/token` with `purpose: "tts"`), one stream per
+  piece; first audio ~0.3 s instead of ~1 s. Its seconds are reported by
+  the usage meter (`ttsSeconds`). Pieces play in order; waiting pieces are
+  read faster (1.12/1.25) and more than 4 waiting are dropped.
+- Soniox captions use `endpoint_latency_adjustment_level: 2` and
+  `max_endpoint_delay_ms: 1000` to close sentences sooner. The translation
+  target is set per connection, so the connection is switched when the
+  others' language changes mid-talk (old one finishes first).
 - OpenAI: `openai-voice.tsx` opens one gpt-realtime-translate WebRTC
   session per remote participant who reads another language, sending
   their Daily audio track; secret from `POST .../voice-session`. Session
@@ -122,6 +131,9 @@ All documented in `.env.example` (copy to `.env.local`). Key rules:
   written, so price changes don't rewrite history). `src/lib/usage.ts`
   saves (`recordUsage`, never throws) and sums (by room, by month in
   Brazil time).
+- Daily video is only charged beyond 10,000 participant-minutes a month:
+  the usage route reads the month's video seconds so far and saves only
+  the part above the allowance as cost (`dailyVideoCost`).
 - What is measured: each browser reports every 60 s and on leave
   (`use-usage-meter.ts` -> `POST /api/rooms/[roomId]/usage`, max 120 s per
   report) its call time (Daily participant-minutes) and how long the

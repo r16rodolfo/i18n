@@ -232,6 +232,9 @@ export function useSoniox({
           num_channels: 1,
           language_hints: [language],
           enable_endpoint_detection: true,
+          // Close a sentence sooner after you stop (default waits up to 2 s)
+          endpoint_latency_adjustment_level: 2,
+          max_endpoint_delay_ms: 1000,
           ...(pieceRef.current.target
             ? {
                 translation: {

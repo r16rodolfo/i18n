@@ -6,10 +6,18 @@ export function hasSonioxKey(): boolean {
   return Boolean(process.env.SONIOX_API_KEY?.trim());
 }
 
-// Temporary key that lets one browser open one realtime transcription +
-// translation connection. It works once and expires in a few minutes, so
-// the browser asks for a new one for every connection.
-export async function createSonioxTempKey(): Promise<string | null> {
+// Temporary keys for the browser (the real key stays here):
+// - "stt": opens one realtime transcription + translation connection. It
+//   works once and expires in a few minutes, so the browser asks for a new
+//   one for every connection.
+// - "tts": reads the translated captions aloud (translated voice) over one
+//   connection kept open for the whole call, so it lasts 30 minutes and
+//   can be used many times.
+export const SONIOX_TTS_KEY_SECONDS = 1800;
+
+export async function createSonioxTempKey(
+  purpose: "stt" | "tts" = "stt",
+): Promise<string | null> {
   try {
     const res = await fetch(`${SONIOX_API}/v1/auth/temporary-api-key`, {
       method: "POST",
@@ -17,11 +25,19 @@ export async function createSonioxTempKey(): Promise<string | null> {
         Authorization: `Bearer ${process.env.SONIOX_API_KEY?.trim() ?? ""}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        usage_type: "transcribe_websocket",
-        expires_in_seconds: 300,
-        single_use: true,
-      }),
+      body: JSON.stringify(
+        purpose === "tts"
+          ? {
+              usage_type: "tts_rt",
+              expires_in_seconds: SONIOX_TTS_KEY_SECONDS,
+              single_use: false,
+            }
+          : {
+              usage_type: "transcribe_websocket",
+              expires_in_seconds: 300,
+              single_use: true,
+            },
+      ),
       cache: "no-store",
     });
     const body = await res.json().catch(() => null);
