@@ -102,6 +102,13 @@ const TEXT = {
     voiceOn: "Ouvindo a tradução por voz (clique para desligar)",
     voiceOff: "Tradução por voz desligada (clique para ouvir)",
     floorWaitVoice: "Aguarde a tradução",
+    screenShare: "Compartilhar tela",
+    screenShareStop: "Parar de compartilhar",
+    screenShareBusy: (name: string) =>
+      `${name || "Alguém"} já está compartilhando a tela`,
+    screenSharedBy: (name: string) =>
+      `${name || "Alguém"} está compartilhando a tela`,
+    screenSharingYou: "Você está compartilhando a sua tela",
   },
   es: {
     joinEyebrow: "[ UNIRSE A LA REUNIÓN ]",
@@ -164,6 +171,13 @@ const TEXT = {
     voiceOn: "Escuchando la traducción por voz (clic para apagar)",
     voiceOff: "Traducción por voz apagada (clic para escuchar)",
     floorWaitVoice: "Espera la traducción",
+    screenShare: "Compartir pantalla",
+    screenShareStop: "Dejar de compartir",
+    screenShareBusy: (name: string) =>
+      `${name || "Alguien"} ya está compartiendo la pantalla`,
+    screenSharedBy: (name: string) =>
+      `${name || "Alguien"} está compartiendo la pantalla`,
+    screenSharingYou: "Estás compartiendo tu pantalla",
   },
 } satisfies Record<UiLang, Record<string, unknown>>;
 

@@ -94,6 +94,15 @@ All documented in `.env.example` (copy to `.env.local`). Key rules:
   `POST /api/rooms/[roomId]/settings` from the dashboard or the call
   (team only, `src/lib/team-room.ts`).
 
+### Screen sharing
+- `useScreenShare()` (daily-react) in `call-ui.tsx`; button in the controls
+  only where `getDisplayMedia` exists (computers), one screen at a time.
+  Remote screens are subscribed explicitly (`screenVideo`/`screenAudio` in
+  `setSubscribedTracks`, since auto-subscribe is off) and shown big by
+  `screen-share-view.tsx`; camera tiles become a strip below (same
+  container element, so tiles and their audio never remount). Your own
+  screen is not shown back to you, only a note.
+
 ### Translated voice
 - `src/lib/voice-engines.ts` (server) + `voice-options.ts` (client-safe
   constants): `none | soniox | elevenlabs | openai`, chosen in /admin
