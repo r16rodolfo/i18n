@@ -19,6 +19,10 @@ import { EmailConfirmDialog } from "./email-confirm-dialog";
 import { liveTranscriptOf, useCaptions } from "./hooks/use-captions";
 import { useFloor } from "./hooks/use-floor";
 import { useIntentDetection } from "./hooks/use-intent-detection";
+import {
+  canRecordLocally,
+  useMeetingRecording,
+} from "./hooks/use-meeting-recording";
 import { useRoomEntry } from "./hooks/use-room-entry";
 import { useScribe } from "./hooks/use-scribe";
 import { useSoniox } from "./hooks/use-soniox";
@@ -28,6 +32,7 @@ import { useMeetingCost, useUsageMeter } from "./hooks/use-usage-meter";
 import { MeetingCost } from "./meeting-cost";
 import { OpenAIVoiceLink } from "./openai-voice";
 import { ParticipantTile } from "./participant-tile";
+import { RecordingIndicator } from "./recording-indicator";
 import { ScreenShareView } from "./screen-share-view";
 import { ShareModal } from "./share-modal";
 import { TranscriptSidebar } from "./transcript-sidebar";
@@ -303,6 +308,14 @@ export function CallUI({
     ? (daily?.participants()[sharedScreen.session_id]?.user_name ?? "")
     : null;
 
+  // Recording (team starts it; everyone sees it)
+  const recording = useMeetingRecording({
+    daily,
+    ready: inCall,
+    roomId,
+    myName: username,
+  });
+
   // Team only: lock/entry mode of the room and guests waiting to get in
   const roomEntry = useRoomEntry(
     roomId,
@@ -570,6 +583,15 @@ export function CallUI({
 
           {isTeamMember && <MeetingCost cost={meetingCost} />}
 
+          <RecordingIndicator
+            cloud={recording.cloudRecording}
+            localBy={[
+              ...(recording.localRecording ? [""] : []),
+              ...recording.othersRecordingLocally,
+            ]}
+            t={t}
+          />
+
           {isTeamMember && (
             <WaitingGuests
               guests={roomEntry.waiting}
@@ -664,6 +686,21 @@ export function CallUI({
         languages={
           onChangeLanguages && !usePalabra
             ? { spoken: spokenLanguage, onChange: onChangeLanguages }
+            : undefined
+        }
+        record={
+          isTeamMember
+            ? {
+                cloud: recording.cloudRecording,
+                local: recording.localRecording,
+                busy: recording.cloudBusy,
+                canRecordLocally: canRecordLocally(),
+                error: recording.error,
+                onStartCloud: recording.startCloud,
+                onStopCloud: recording.stopCloud,
+                onStartLocal: recording.startLocal,
+                onStopLocal: recording.stopLocal,
+              }
             : undefined
         }
         screenShare={

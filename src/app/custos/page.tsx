@@ -1,8 +1,12 @@
 import Link from "next/link";
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download } from "lucide-react";
 
 import { requireTeamMember } from "@/lib/auth";
+import {
+  type CloudRecording,
+  listCloudRecordings,
+} from "@/lib/daily-recordings";
 import { currentMonth, getMonthRooms, getMonthUsage } from "@/lib/usage";
 import {
   DAILY_FREE_MINUTES,
@@ -19,6 +23,12 @@ export const metadata = { title: "Custos · R16 Meet" };
 const dateTimeFormat = new Intl.DateTimeFormat("pt-BR", {
   day: "2-digit",
   month: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: "America/Sao_Paulo",
+});
+
+const timeOnlyFormat = new Intl.DateTimeFormat("pt-BR", {
   hour: "2-digit",
   minute: "2-digit",
   timeZone: "America/Sao_Paulo",
@@ -51,10 +61,23 @@ export default async function CostsPage({
   const thisMonth = currentMonth();
   const month = mes && /^\d{4}-(0[1-9]|1[0-2])$/.test(mes) ? mes : thisMonth;
 
-  const [usage, meetings] = await Promise.all([
+  const [usage, meetings, recordings] = await Promise.all([
     getMonthUsage(month),
     getMonthRooms(month),
+    // Cloud recordings, to download from each meeting (the page still works
+    // if Daily doesn't answer)
+    listCloudRecordings().catch((error) => {
+      console.error("[custos] recordings unavailable:", error);
+      return [] as CloudRecording[];
+    }),
   ]);
+  const recordingsByRoom = new Map<string, CloudRecording[]>();
+  for (const recording of recordings) {
+    if (recording.status !== "finished") continue;
+    const list = recordingsByRoom.get(recording.roomName) ?? [];
+    list.push(recording);
+    recordingsByRoom.set(recording.roomName, list);
+  }
   const services = [...usage.services].sort(
     (a, b) =>
       USAGE_SERVICES.indexOf(a.service) - USAGE_SERVICES.indexOf(b.service),
@@ -195,6 +218,30 @@ export default async function CostsPage({
                       );
                     })}
                   </ul>
+                  {(recordingsByRoom.get(meeting.roomName) ?? []).length >
+                    0 && (
+                    <ul className="flex flex-wrap gap-2 pt-1">
+                      {(recordingsByRoom.get(meeting.roomName) ?? []).map(
+                        (recording) => (
+                          <li key={recording.id}>
+                            <a
+                              href={`/api/recordings/${recording.id}`}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 px-2 py-1 text-xs text-black hover:bg-neutral-50"
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                              Gravação das{" "}
+                              {timeOnlyFormat.format(
+                                new Date(recording.startedAt),
+                              )}{" "}
+                              ·{" "}
+                              {Math.max(1, Math.round(recording.duration / 60))}{" "}
+                              min
+                            </a>
+                          </li>
+                        ),
+                      )}
+                    </ul>
+                  )}
                 </li>
               ))}
             </ul>

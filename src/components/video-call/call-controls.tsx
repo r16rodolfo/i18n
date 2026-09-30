@@ -5,9 +5,12 @@ import { useState } from "react";
 import {
   Captions,
   CaptionsOff,
+  Circle,
+  Cloud,
   DoorOpen,
   Hand,
   Info,
+  Laptop,
   Lock,
   LockOpen,
   MessageSquareText,
@@ -17,6 +20,7 @@ import {
   MonitorUp,
   PhoneOff,
   ShieldCheck,
+  Square,
   Video,
   VideoOff,
   Volume2,
@@ -40,6 +44,19 @@ export interface FloorControls {
   // The translated voice of the last speaker is still playing for you:
   // wait before talking, or you would talk over it
   waitForVoice?: boolean;
+}
+
+// Team only: record the meeting in the cloud (Daily) or on this computer
+export interface RecordControls {
+  cloud: boolean;
+  local: boolean;
+  busy: boolean;
+  canRecordLocally: boolean;
+  error: string | null;
+  onStartCloud: () => void;
+  onStopCloud: () => void;
+  onStartLocal: () => void;
+  onStopLocal: () => void;
 }
 
 // Change the languages you speak and hear, during the call
@@ -106,6 +123,7 @@ interface CallControlsProps {
   captionsToggle?: CaptionsToggle;
   voiceToggle?: VoiceToggle;
   screenShare?: ScreenShareToggle;
+  record?: RecordControls;
   languages?: LanguageControls;
   transcriptToggle?: TranscriptToggle;
   roomControls?: RoomControls;
@@ -125,6 +143,7 @@ export function CallControls({
   captionsToggle,
   voiceToggle,
   screenShare,
+  record,
   languages,
   transcriptToggle,
   roomControls,
@@ -133,6 +152,7 @@ export function CallControls({
   const t = uiText(uiLang);
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
   const [voiceMenuOpen, setVoiceMenuOpen] = useState(false);
+  const [recordMenuOpen, setRecordMenuOpen] = useState(false);
 
   return (
     <div className="shrink-0 bg-neutral-800/90 backdrop-blur-sm p-4 border-t border-white/5 relative">
@@ -293,6 +313,95 @@ export function CallControls({
               <MonitorUp className="w-5 h-5" />
             )}
           </Button>
+        )}
+        {record && (
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setRecordMenuOpen((open) => !open)}
+              className={cn(
+                "p-2 rounded-lg transition-colors cursor-pointer hover:bg-white/10",
+                record.cloud || record.local
+                  ? "text-red-400 hover:text-red-300"
+                  : "text-white/50 hover:text-white",
+              )}
+              title={
+                record.cloud || record.local
+                  ? "Gravando (clique para parar)"
+                  : "Gravar a reunião"
+              }
+              aria-label="Gravar a reunião"
+              aria-expanded={recordMenuOpen}
+            >
+              <Circle
+                className={cn(
+                  "w-5 h-5",
+                  (record.cloud || record.local) &&
+                    "fill-current animate-pulse",
+                )}
+              />
+            </button>
+            {recordMenuOpen && (
+              <div className="absolute bottom-full right-0 z-50 mb-3 w-72 space-y-2 rounded-xl border border-white/10 bg-neutral-950/95 p-3 text-sm text-white shadow-2xl">
+                <p className="px-1 text-xs text-white/60">
+                  Todos na chamada veem que está sendo gravada.
+                </p>
+                <button
+                  type="button"
+                  disabled={record.busy}
+                  onClick={
+                    record.cloud ? record.onStopCloud : record.onStartCloud
+                  }
+                  className="flex w-full items-start gap-3 rounded-lg p-2 text-left hover:bg-white/10 cursor-pointer disabled:opacity-50"
+                >
+                  {record.cloud ? (
+                    <Square className="mt-0.5 h-4 w-4 shrink-0 fill-current text-red-400" />
+                  ) : (
+                    <Cloud className="mt-0.5 h-4 w-4 shrink-0" />
+                  )}
+                  <span>
+                    {record.cloud
+                      ? "Parar a gravação na nuvem"
+                      : "Gravar na nuvem"}
+                    <span className="block text-xs text-white/50">
+                      Vídeo e vozes originais, fica no Daily (baixe em Custos).
+                      ~US$ 1 por hora.
+                    </span>
+                  </span>
+                </button>
+                {record.canRecordLocally && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRecordMenuOpen(false);
+                      if (record.local) record.onStopLocal();
+                      else record.onStartLocal();
+                    }}
+                    className="flex w-full items-start gap-3 rounded-lg p-2 text-left hover:bg-white/10 cursor-pointer"
+                  >
+                    {record.local ? (
+                      <Square className="mt-0.5 h-4 w-4 shrink-0 fill-current text-red-400" />
+                    ) : (
+                      <Laptop className="mt-0.5 h-4 w-4 shrink-0" />
+                    )}
+                    <span>
+                      {record.local
+                        ? "Parar e salvar o arquivo"
+                        : "Gravar no meu computador"}
+                      <span className="block text-xs text-white/50">
+                        Grava esta aba como você vê e ouve (com legendas e voz
+                        traduzida). Escolha "Esta aba" e marque o áudio. Sem
+                        custo.
+                      </span>
+                    </span>
+                  </button>
+                )}
+                {record.error && (
+                  <p className="px-1 text-xs text-red-400">{record.error}</p>
+                )}
+              </div>
+            )}
+          </div>
         )}
         {voiceToggle && (
           <div className="relative">

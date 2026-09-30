@@ -1,7 +1,8 @@
-import { db } from "@/db";
-import { rooms } from "@/db/schema";
 import { getTeamMember, unauthorized } from "@/lib/auth";
 import { generateInviteToken, generateRoomId } from "@/lib/nanoid";
+
+import { db } from "@/db";
+import { rooms } from "@/db/schema";
 
 const ROOM_DURATION_SECONDS = 3600 * 2; // 2 hours
 
@@ -34,6 +35,8 @@ export async function POST() {
           enable_knocking: false,
           start_video_off: false,
           start_audio_off: false,
+          // The team can record in the cloud (only when they press Gravar)
+          enable_recording: "cloud",
           // Transcription permissions
           permissions: {
             canAdmin: ["transcription"],

@@ -150,6 +150,21 @@ All documented in `.env.example` (copy to `.env.local`). Key rules:
   (`echo-safe-output.ts`; gain node = volume). OpenAI's voice already
   arrives over WebRTC (volume on its `<audio>`).
 
+### Recording (team only; everyone is told)
+- Cloud (Daily): `src/lib/daily-recordings.ts` starts/stops via Daily REST
+  (turning `enable_recording: "cloud"` on for old rooms; new rooms get it at
+  creation), `POST /api/rooms/[roomId]/recording` (team) and records the
+  cost (`recording_cloud`, recording + storage per minute) on stop.
+  Downloads: `/custos` lists finished recordings per meeting ->
+  `GET /api/recordings/[id]` (team) redirects to Daily's access link.
+  Records the original voices only (translation happens in each browser).
+- On this computer: `use-meeting-recording.ts` records the tab
+  (`getDisplayMedia`, "this tab" + audio) mixed with your mic via
+  `MediaRecorder` and downloads a .webm on stop; others are told with a
+  `r16-recording` app message. Chrome/Edge desktop only.
+- `recording-indicator.tsx` shows the red notice to everyone (Daily's
+  recording state for cloud, app messages for local).
+
 ### Services status (/admin)
 - `src/lib/service-health.ts` probes every outside service with the real
   keys (free temporary tokens; one word through OpenAI) and returns
