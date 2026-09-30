@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   useDaily,
@@ -52,6 +52,7 @@ export function CallUI({
   isTeamMember,
   invitePath,
   roomSettings,
+  onChangeLanguages,
 }: VideoCallProps) {
   const uiLang = uiLangFor(spokenLanguage);
   const t = uiText(uiLang);
@@ -298,6 +299,12 @@ export function CallUI({
     enabled: !isJoining && isTeamMember,
   });
 
+  // Palabra's start/stop change with the languages; read them through a ref
+  // so switching languages mid-call never makes the effect below leave and
+  // rejoin the call
+  const transcriptionRef = useRef({ startTranscription, stopTranscription });
+  transcriptionRef.current = { startTranscription, stopTranscription };
+
   // Join call and start transcription
   useEffect(() => {
     if (!daily) return;
@@ -323,7 +330,7 @@ export function CallUI({
         });
 
         if (usePalabra) {
-          await startTranscription();
+          await transcriptionRef.current.startTranscription();
         }
         setIsJoining(false);
         if (invitePath) setShowShareModal(true);
@@ -337,19 +344,11 @@ export function CallUI({
     return () => {
       const meetingState = daily.meetingState();
       if (meetingState === "joined-meeting") {
-        stopTranscription();
+        transcriptionRef.current.stopTranscription();
         daily.leave();
       }
     };
-  }, [
-    daily,
-    roomUrl,
-    token,
-    invitePath,
-    usePalabra,
-    startTranscription,
-    stopTranscription,
-  ]);
+  }, [daily, roomUrl, token, invitePath, usePalabra]);
 
   // Feed remote audio tracks to Palabra for translation
   useDailyEvent("track-started", (event) => {
@@ -400,6 +399,24 @@ export function CallUI({
     if (micOpen) startEngine();
     else stopEngine();
   }, [daily, isJoining, micOpen, liveCaptions, startEngine, stopEngine]);
+
+  // You switched the language you speak while talking: restart the
+  // transcription in the new language (it is set when a connection opens)
+  const lastSpokenRef = useRef(spokenLanguage);
+  useEffect(() => {
+    if (lastSpokenRef.current === spokenLanguage) return;
+    lastSpokenRef.current = spokenLanguage;
+    if (!liveCaptions || !micOpen || isJoining) return;
+    stopEngine();
+    startEngine();
+  }, [
+    spokenLanguage,
+    liveCaptions,
+    micOpen,
+    isJoining,
+    stopEngine,
+    startEngine,
+  ]);
 
   // Give the floor back after a long silence, so nobody stays locked out
   const { iHold, release: releaseFloor } = floor;
@@ -603,6 +620,11 @@ export function CallUI({
                 open: transcriptOpen,
                 onToggle: () => setTranscriptOpen((open) => !open),
               }
+            : undefined
+        }
+        languages={
+          onChangeLanguages && !usePalabra
+            ? { spoken: spokenLanguage, onChange: onChangeLanguages }
             : undefined
         }
         screenShare={

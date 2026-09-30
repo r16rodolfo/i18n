@@ -103,6 +103,17 @@ All documented in `.env.example` (copy to `.env.local`). Key rules:
   container element, so tiles and their audio never remount). Your own
   screen is not shown back to you, only a note.
 
+### Changing languages mid-call
+- The language indicator in the controls opens "I speak / I hear"
+  (`LanguageControls`, hidden with Palabra); `room-client.tsx` owns the
+  state (`onChangeLanguages`). Hearing follows speaking unless set apart.
+- Captions re-announce `lang`, so speakers switch their Soniox connection to
+  the new target (retarget effect in `use-soniox.ts`); a change of your
+  own spoken language while talking restarts the engine (`call-ui.tsx`).
+- The Daily join effect must not depend on anything that changes with the
+  languages (Palabra's start/stop are read through a ref): otherwise a
+  language change leaves the call.
+
 ### Translated voice
 - `src/lib/voice-engines.ts` (server) + `voice-options.ts` (client-safe
   constants): `none | soniox | elevenlabs | openai`, chosen in /admin

@@ -109,6 +109,8 @@ const TEXT = {
     screenSharedBy: (name: string) =>
       `${name || "Alguém"} está compartilhando a tela`,
     screenSharingYou: "Você está compartilhando a sua tela",
+    changeLanguages: "Trocar os idiomas (falo / ouço)",
+    done: "Pronto",
   },
   es: {
     joinEyebrow: "[ UNIRSE A LA REUNIÓN ]",
@@ -178,6 +180,8 @@ const TEXT = {
     screenSharedBy: (name: string) =>
       `${name || "Alguien"} está compartiendo la pantalla`,
     screenSharingYou: "Estás compartiendo tu pantalla",
+    changeLanguages: "Cambiar los idiomas (hablo / escucho)",
+    done: "Listo",
   },
 } satisfies Record<UiLang, Record<string, unknown>>;
 

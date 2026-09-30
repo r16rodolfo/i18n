@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import {
   Captions,
   CaptionsOff,
@@ -25,6 +27,7 @@ import { getLanguageFlag, type LanguageCode } from "@/lib/languages";
 import { languageName, type UiLang, uiText } from "@/lib/ui-text";
 import { cn } from "@/lib/utils";
 
+import { LanguageSelector } from "@/components/language-selector";
 import { Button } from "@/components/ui/button";
 
 // Floor control ("trava de fala"): replaces the mic button while it is on
@@ -37,6 +40,12 @@ export interface FloorControls {
   // The translated voice of the last speaker is still playing for you:
   // wait before talking, or you would talk over it
   waitForVoice?: boolean;
+}
+
+// Change the languages you speak and hear, during the call
+export interface LanguageControls {
+  spoken: LanguageCode;
+  onChange: (spoken: LanguageCode, preferred: LanguageCode) => void;
 }
 
 // Share your screen (computers only). `busyWith` names someone else who is
@@ -93,6 +102,7 @@ interface CallControlsProps {
   captionsToggle?: CaptionsToggle;
   voiceToggle?: VoiceToggle;
   screenShare?: ScreenShareToggle;
+  languages?: LanguageControls;
   transcriptToggle?: TranscriptToggle;
   roomControls?: RoomControls;
   uiLang: UiLang;
@@ -111,20 +121,75 @@ export function CallControls({
   captionsToggle,
   voiceToggle,
   screenShare,
+  languages,
   transcriptToggle,
   roomControls,
   uiLang,
 }: CallControlsProps) {
   const t = uiText(uiLang);
+  const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
 
   return (
     <div className="shrink-0 bg-neutral-800/90 backdrop-blur-sm p-4 border-t border-white/5 relative">
       {/* Language indicator - absolute positioned so it doesn't affect centering */}
-      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/70 text-sm flex items-center gap-2">
-        <span>{getLanguageFlag(preferredLanguage)}</span>
-        <span className="hidden sm:inline">
-          {t.hearingIn(languageName(preferredLanguage, uiLang))}
-        </span>
+      <div className="absolute left-4 top-1/2 -translate-y-1/2">
+        {languages ? (
+          <button
+            type="button"
+            onClick={() => setLanguageMenuOpen((open) => !open)}
+            className="flex items-center gap-2 rounded-lg px-2 py-1 text-sm text-white/70 hover:bg-white/10 hover:text-white cursor-pointer"
+            title={t.changeLanguages}
+            aria-expanded={languageMenuOpen}
+          >
+            <span>{getLanguageFlag(preferredLanguage)}</span>
+            <span className="hidden sm:inline">
+              {t.hearingIn(languageName(preferredLanguage, uiLang))}
+            </span>
+          </button>
+        ) : (
+          <div className="flex items-center gap-2 text-sm text-white/70">
+            <span>{getLanguageFlag(preferredLanguage)}</span>
+            <span className="hidden sm:inline">
+              {t.hearingIn(languageName(preferredLanguage, uiLang))}
+            </span>
+          </div>
+        )}
+        {languages && languageMenuOpen && (
+          <div className="absolute bottom-full left-0 z-50 mb-3 w-64 space-y-3 rounded-xl border border-white/10 bg-neutral-950/95 p-4 text-white shadow-2xl">
+            <div className="space-y-1 text-neutral-900">
+              <p className="text-xs text-white/60">{t.iSpeak}</p>
+              <LanguageSelector
+                value={languages.spoken}
+                onChange={(lang) =>
+                  // Hearing follows speaking unless they were set apart
+                  languages.onChange(
+                    lang,
+                    preferredLanguage === languages.spoken
+                      ? lang
+                      : preferredLanguage,
+                  )
+                }
+                uiLang={uiLang}
+              />
+            </div>
+            <div className="space-y-1 text-neutral-900">
+              <p className="text-xs text-white/60">{t.iHear}</p>
+              <LanguageSelector
+                value={preferredLanguage}
+                onChange={(lang) => languages.onChange(languages.spoken, lang)}
+                uiLang={uiLang}
+              />
+            </div>
+            <Button
+              size="sm"
+              variant="secondary"
+              className="w-full cursor-pointer"
+              onClick={() => setLanguageMenuOpen(false)}
+            >
+              {t.done}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Centered controls */}
