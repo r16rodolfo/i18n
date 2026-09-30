@@ -150,6 +150,15 @@ All documented in `.env.example` (copy to `.env.local`). Key rules:
   (`echo-safe-output.ts`; gain node = volume). OpenAI's voice already
   arrives over WebRTC (volume on its `<audio>`).
 
+### Services status (/admin)
+- `src/lib/service-health.ts` probes every outside service with the real
+  keys (free temporary tokens; one word through OpenAI) and returns
+  ok / error (with the service's own message) / no-key and the time.
+  `POST /api/admin/health` (admins) adds which checks real meetings use now
+  (`inUse`, from the active translation provider and voice engine);
+  `src/app/admin/service-status.tsx` runs it on open and on "Testar agora".
+  A new service or voice engine needs a probe there.
+
 ### Cost tracking (estimates)
 - `usage_events` (one row per measured use; `room_id` is set null when a
   room is deleted, `room_name` stays) + prices in `src/lib/usage-pricing.ts`
