@@ -90,6 +90,41 @@ export function CallUI({
       // Storage blocked: keep it on
     }
   }, []);
+  // How loud the translated voice and the original voice (of people who
+  // speak another language) are, while the translated voice is on
+  const [voiceVolumes, setVoiceVolumes] = useState({
+    translated: 1,
+    original: 0.15,
+  });
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("voiceVolumes") ?? "null");
+      if (
+        typeof saved?.translated === "number" &&
+        typeof saved?.original === "number"
+      ) {
+        setVoiceVolumes({
+          translated: saved.translated,
+          original: saved.original,
+        });
+      }
+    } catch {
+      // Storage blocked or invalid: keep the defaults
+    }
+  }, []);
+  const changeVoiceVolumes = useCallback(
+    (translated: number, original: number) => {
+      const next = { translated, original };
+      setVoiceVolumes(next);
+      try {
+        localStorage.setItem("voiceVolumes", JSON.stringify(next));
+      } catch {
+        // Storage blocked: only for this call
+      }
+    },
+    [],
+  );
+
   const toggleVoice = useCallback(() => {
     setHearVoice((current) => {
       try {
@@ -159,6 +194,7 @@ export function CallUI({
     visitorId,
     language: preferredLanguage,
     engine: voiceEngine === "elevenlabs" ? "elevenlabs" : "soniox",
+    volume: voiceVolumes.translated,
   });
   const captions = useCaptions({
     daily,
@@ -248,7 +284,9 @@ export function CallUI({
   // With the voice on, the original voice of people who speak another
   // language is kept low (you hear them through the translation)
   const volumeFor = (sessionId: string) =>
-    voiceOn && translatedSpeakers.includes(sessionId) ? 0.15 : originalVolume;
+    voiceOn && translatedSpeakers.includes(sessionId)
+      ? voiceVolumes.original
+      : originalVolume;
 
   // Screen sharing (computers only; one screen at a time). Your own screen
   // isn't shown back to you, just a note that you are sharing it.
@@ -525,6 +563,7 @@ export function CallUI({
                   language={preferredLanguage}
                   onSpeaking={onOpenAISpeaking}
                   onConnected={onOpenAIConnected}
+                  volume={voiceVolumes.translated}
                 />
               ))}
           </div>
@@ -638,7 +677,15 @@ export function CallUI({
             : undefined
         }
         voiceToggle={
-          hasVoice ? { enabled: hearVoice, onToggle: toggleVoice } : undefined
+          hasVoice
+            ? {
+                enabled: hearVoice,
+                onToggle: toggleVoice,
+                translatedVolume: voiceVolumes.translated,
+                originalVolume: voiceVolumes.original,
+                onVolumes: changeVoiceVolumes,
+              }
+            : undefined
         }
         captionsToggle={
           liveCaptions

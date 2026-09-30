@@ -22,6 +22,8 @@ interface OpenAIVoiceLinkProps {
   language: string;
   onSpeaking: (sessionId: string, speaking: boolean) => void;
   onConnected: (sessionId: string, connected: boolean) => void;
+  // 0 to 1, chosen by the listener
+  volume: number;
 }
 
 export function OpenAIVoiceLink({
@@ -31,9 +33,13 @@ export function OpenAIVoiceLink({
   language,
   onSpeaking,
   onConnected,
+  volume,
 }: OpenAIVoiceLinkProps) {
   const { persistentTrack } = useMediaTrack(sessionId, "audio");
   const audioRef = useRef<HTMLAudioElement>(null);
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = volume;
+  }, [volume]);
   const senderRef = useRef<RTCRtpSender | null>(null);
   const trackRef = useRef<MediaStreamTrack | undefined>(persistentTrack);
   // Bumped to open a new session after a failure

@@ -110,6 +110,11 @@ const TEXT = {
       `${name || "Alguém"} está compartilhando a tela`,
     screenSharingYou: "Você está compartilhando a sua tela",
     changeLanguages: "Trocar os idiomas (falo / ouço)",
+    voiceHear: "Ouvir a tradução por voz",
+    voiceTranslatedVolume: "Voz traduzida",
+    voiceOriginalVolume: "Voz original de quem fala outra língua",
+    voiceHeadphones:
+      "Sem fone de ouvido, as vozes podem voltar pelo seu microfone (eco). Com fone fica melhor.",
     done: "Pronto",
   },
   es: {
@@ -181,6 +186,11 @@ const TEXT = {
       `${name || "Alguien"} está compartiendo la pantalla`,
     screenSharingYou: "Estás compartiendo tu pantalla",
     changeLanguages: "Cambiar los idiomas (hablo / escucho)",
+    voiceHear: "Escuchar la traducción por voz",
+    voiceTranslatedVolume: "Voz traducida",
+    voiceOriginalVolume: "Voz original de quien habla otro idioma",
+    voiceHeadphones:
+      "Sin auriculares, las voces pueden volver por tu micrófono (eco). Con auriculares es mejor.",
     done: "Listo",
   },
 } satisfies Record<UiLang, Record<string, unknown>>;

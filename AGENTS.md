@@ -141,8 +141,14 @@ All documented in `.env.example` (copy to `.env.local`). Key rules:
   their Daily audio track; secret from `POST .../voice-session`. Session
   time is reported by the usage meter.
 - While the voice is on, the original audio of other-language participants
-  plays at 15 %, and "Falar" shows "Aguarde a tradução" while the voice
-  is playing. Each person toggles the voice (Volume icon, remembered).
+  plays at the listener's "original voice" volume (default 15 %), and
+  "Falar" shows "Aguarde a tradução" while the voice is playing. The voice
+  button opens a small mixer: voice on/off, translated volume, original
+  volume (saved in localStorage `voiceVolumes`).
+- Echo: Chrome's echo cancellation ignores Web Audio output, so the
+  Soniox/ElevenLabs voice is played through an in-page WebRTC loopback
+  (`echo-safe-output.ts`; gain node = volume). OpenAI's voice already
+  arrives over WebRTC (volume on its `<audio>`).
 
 ### Cost tracking (estimates)
 - `usage_events` (one row per measured use; `room_id` is set null when a

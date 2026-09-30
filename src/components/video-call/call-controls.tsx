@@ -56,10 +56,14 @@ export interface ScreenShareToggle {
   onToggle: () => void;
 }
 
-// Hear the others in your language (translated voice), each person decides
+// Hear the others in your language (translated voice), each person decides,
+// and how loud the translated and the original voices are (0 to 1)
 export interface VoiceToggle {
   enabled: boolean;
   onToggle: () => void;
+  translatedVolume: number;
+  originalVolume: number;
+  onVolumes: (translated: number, original: number) => void;
 }
 
 // Show/hide the captions under the video (each person decides for themselves)
@@ -128,6 +132,7 @@ export function CallControls({
 }: CallControlsProps) {
   const t = uiText(uiLang);
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
+  const [voiceMenuOpen, setVoiceMenuOpen] = useState(false);
 
   return (
     <div className="shrink-0 bg-neutral-800/90 backdrop-blur-sm p-4 border-t border-white/5 relative">
@@ -290,25 +295,84 @@ export function CallControls({
           </Button>
         )}
         {voiceToggle && (
-          <button
-            type="button"
-            onClick={voiceToggle.onToggle}
-            className={cn(
-              "p-2 rounded-lg transition-colors cursor-pointer hover:bg-white/10",
-              voiceToggle.enabled
-                ? "text-white hover:text-white"
-                : "text-white/50 hover:text-white",
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setVoiceMenuOpen((open) => !open)}
+              aria-expanded={voiceMenuOpen}
+              className={cn(
+                "p-2 rounded-lg transition-colors cursor-pointer hover:bg-white/10",
+                voiceToggle.enabled
+                  ? "text-white hover:text-white"
+                  : "text-white/50 hover:text-white",
+              )}
+              title={voiceToggle.enabled ? t.voiceOn : t.voiceOff}
+              aria-label={voiceToggle.enabled ? t.voiceOn : t.voiceOff}
+              aria-pressed={voiceToggle.enabled}
+            >
+              {voiceToggle.enabled ? (
+                <Volume2 className="w-5 h-5" />
+              ) : (
+                <VolumeX className="w-5 h-5" />
+              )}
+            </button>
+            {voiceMenuOpen && (
+              <div className="absolute bottom-full right-0 z-50 mb-3 w-72 space-y-4 rounded-xl border border-white/10 bg-neutral-950/95 p-4 text-sm text-white shadow-2xl">
+                <label className="flex cursor-pointer items-center justify-between gap-3">
+                  <span>{t.voiceHear}</span>
+                  <input
+                    type="checkbox"
+                    checked={voiceToggle.enabled}
+                    onChange={voiceToggle.onToggle}
+                    className="h-4 w-4 cursor-pointer accent-emerald-500"
+                  />
+                </label>
+                <label className="block space-y-1">
+                  <span className="flex justify-between text-white/70">
+                    {t.voiceTranslatedVolume}
+                    <span>
+                      {Math.round(voiceToggle.translatedVolume * 100)}%
+                    </span>
+                  </span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={Math.round(voiceToggle.translatedVolume * 100)}
+                    disabled={!voiceToggle.enabled}
+                    onChange={(event) =>
+                      voiceToggle.onVolumes(
+                        Number(event.target.value) / 100,
+                        voiceToggle.originalVolume,
+                      )
+                    }
+                    className="w-full cursor-pointer accent-emerald-500 disabled:opacity-40"
+                  />
+                </label>
+                <label className="block space-y-1">
+                  <span className="flex justify-between text-white/70">
+                    {t.voiceOriginalVolume}
+                    <span>{Math.round(voiceToggle.originalVolume * 100)}%</span>
+                  </span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={Math.round(voiceToggle.originalVolume * 100)}
+                    disabled={!voiceToggle.enabled}
+                    onChange={(event) =>
+                      voiceToggle.onVolumes(
+                        voiceToggle.translatedVolume,
+                        Number(event.target.value) / 100,
+                      )
+                    }
+                    className="w-full cursor-pointer accent-emerald-500 disabled:opacity-40"
+                  />
+                </label>
+                <p className="text-xs text-white/50">{t.voiceHeadphones}</p>
+              </div>
             )}
-            title={voiceToggle.enabled ? t.voiceOn : t.voiceOff}
-            aria-label={voiceToggle.enabled ? t.voiceOn : t.voiceOff}
-            aria-pressed={voiceToggle.enabled}
-          >
-            {voiceToggle.enabled ? (
-              <Volume2 className="w-5 h-5" />
-            ) : (
-              <VolumeX className="w-5 h-5" />
-            )}
-          </button>
+          </div>
         )}
         {roomControls && (
           <>
