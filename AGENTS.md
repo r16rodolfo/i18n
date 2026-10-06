@@ -109,8 +109,12 @@ All documented in `.env.example` (copy to `.env.local`). Key rules:
   while their translation is actually playing (`speakingFor` / OpenAI
   speaking), never just because they read another language.
 - Everyone repeats the language they read every 20 s (lost messages).
-- Guest screens follow the language they speak: pt, es, or en for anything
-  else (`uiLangFor`).
+- Guest screens follow the language they speak in the call: pt, es, or en
+  for anything else (`uiLangFor`). The join page starts in the browser's
+  language (guests) and has PT/ES/EN flags on top (saved as `uiLang`);
+  first-time guests also start with their browser language selected.
+- Flags are drawn (`src/components/flag.tsx`, country-flag-icons): flag
+  emojis show as letters on Windows. Spanish uses Paraguay's flag.
 
 ### Screen sharing
 - `useScreenShare()` (daily-react) in `call-ui.tsx`; button in the controls

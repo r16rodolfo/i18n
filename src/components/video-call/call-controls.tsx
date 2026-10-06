@@ -27,10 +27,11 @@ import {
   VolumeX,
 } from "lucide-react";
 
-import { getLanguageFlag, type LanguageCode } from "@/lib/languages";
+import type { LanguageCode } from "@/lib/languages";
 import { languageName, type UiLang, uiText } from "@/lib/ui-text";
 import { cn } from "@/lib/utils";
 
+import { LanguageFlag } from "@/components/flag";
 import { LanguageSelector } from "@/components/language-selector";
 import { Button } from "@/components/ui/button";
 
@@ -166,14 +167,14 @@ export function CallControls({
             title={t.changeLanguages}
             aria-expanded={languageMenuOpen}
           >
-            <span>{getLanguageFlag(preferredLanguage)}</span>
+            <LanguageFlag code={preferredLanguage} />
             <span className="hidden sm:inline">
               {t.hearingIn(languageName(preferredLanguage, uiLang))}
             </span>
           </button>
         ) : (
           <div className="flex items-center gap-2 text-sm text-white/70">
-            <span>{getLanguageFlag(preferredLanguage)}</span>
+            <LanguageFlag code={preferredLanguage} />
             <span className="hidden sm:inline">
               {t.hearingIn(languageName(preferredLanguage, uiLang))}
             </span>

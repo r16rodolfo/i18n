@@ -2,11 +2,20 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { ArrowRight, Hourglass, Loader2 } from "lucide-react";
+import {
+  ArrowRight,
+  Headphones,
+  Hourglass,
+  Languages,
+  Loader2,
+  type LucideIcon,
+  Mic,
+} from "lucide-react";
 
-import type { LanguageCode } from "@/lib/languages";
+import { isValidLanguageCode, type LanguageCode } from "@/lib/languages";
 import type { TranslationProvider } from "@/lib/translation-providers";
 import { languageName, type UiLang, uiLangFor, uiText } from "@/lib/ui-text";
+import { cn } from "@/lib/utils";
 import {
   isVoiceEngine,
   isVoiceGender,
@@ -14,6 +23,7 @@ import {
   type VoiceGender,
 } from "@/lib/voice-options";
 
+import { LanguageFlag } from "@/components/flag";
 import { LanguageSelector } from "@/components/language-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,8 +57,9 @@ export function RoomClient({
     useState<LanguageCode>(defaultLanguage);
   const [preferredLanguage, setPreferredLanguage] =
     useState<LanguageCode>(defaultLanguage);
-  // Guests see the page in the language they pick (Spanish by default)
-  const uiLang: UiLang = isTeamMember ? "pt" : uiLangFor(spokenLanguage);
+  // Language of this page: the team's is Portuguese; guests get their
+  // browser's language (or Spanish), and can switch with the flags on top
+  const [uiLang, setUiLang] = useState<UiLang>(isTeamMember ? "pt" : "es");
   const t = uiText(uiLang);
   const [voiceGender, setVoiceGender] = useState<VoiceGender>("female");
   const [isJoining, setIsJoining] = useState(false);
@@ -76,10 +87,28 @@ export function RoomClient({
       if (storedSpoken) setSpokenLanguage(storedSpoken as LanguageCode);
       if (storedPreferred)
         setPreferredLanguage(storedPreferred as LanguageCode);
+
+      if (!isTeamMember) {
+        // The browser's language, e.g. "en-US" -> "en"
+        const browser = (navigator.languages ?? [navigator.language])
+          .map((tag) => tag.slice(0, 2).toLowerCase())
+          .find(isValidLanguageCode);
+        const storedUi = localStorage.getItem("uiLang");
+        if (storedUi === "pt" || storedUi === "es" || storedUi === "en") {
+          setUiLang(storedUi);
+        } else if (browser) {
+          setUiLang(uiLangFor(browser));
+        }
+        // First visit: start with the language they likely speak
+        if (!storedSpoken && browser) {
+          setSpokenLanguage(browser);
+          setPreferredLanguage(browser);
+        }
+      }
     } catch {
       // Storage blocked (private mode): keep the defaults
     }
-  }, []);
+  }, [isTeamMember]);
 
   const remember = (key: string, value: string) => {
     try {
@@ -209,11 +238,46 @@ export function RoomClient({
     );
   }
 
+  const pickGender = (gender: VoiceGender) => {
+    setVoiceGender(gender);
+    remember("voiceGender", gender);
+  };
+
   // Show join form
   return (
     <div className="min-h-screen bg-neutral-100 flex items-center justify-center">
-      <div className="w-full max-w-md p-8">
-        <div className="space-y-6">
+      <div className="w-full max-w-md px-6 py-10">
+        {/* Language of this page */}
+        <div className="mb-6 flex justify-end">
+          <fieldset
+            aria-label={t.pageLanguage}
+            className="flex items-center gap-1 rounded-full border border-neutral-200 bg-white p-1"
+          >
+            {(["pt", "es", "en"] as const).map((lang) => (
+              <button
+                key={lang}
+                type="button"
+                onClick={() => {
+                  setUiLang(lang);
+                  remember("uiLang", lang);
+                }}
+                aria-pressed={uiLang === lang}
+                title={languageName(lang, lang)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium cursor-pointer transition-colors",
+                  uiLang === lang
+                    ? "bg-black text-white"
+                    : "text-neutral-600 hover:bg-neutral-100",
+                )}
+              >
+                <LanguageFlag code={lang} className="h-3" />
+                {lang.toUpperCase()}
+              </button>
+            ))}
+          </fieldset>
+        </div>
+
+        <div className="space-y-7">
           <div className="space-y-2 text-center">
             <p className="text-xs font-medium tracking-widest uppercase text-neutral-500">
               {t.joinEyebrow}
@@ -224,12 +288,21 @@ export function RoomClient({
             <p className="text-neutral-600">{t.joinSubtitle}</p>
           </div>
 
+          {/* How it works, in one glance */}
+          <div className="flex items-start justify-center gap-2 text-center">
+            <HowStep icon={Mic} label={t.stepSpeak} />
+            <ArrowRight className="mt-3.5 h-4 w-4 shrink-0 text-neutral-300" />
+            <HowStep icon={Languages} label={t.stepTranslate} />
+            <ArrowRight className="mt-3.5 h-4 w-4 shrink-0 text-neutral-300" />
+            <HowStep icon={Headphones} label={t.stepHear} />
+          </div>
+
           <form
             onSubmit={(e) => {
               e.preventDefault();
               handleJoin();
             }}
-            className="space-y-4"
+            className="space-y-5"
           >
             <div className="space-y-2">
               <label
@@ -251,9 +324,10 @@ export function RoomClient({
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-black">
+              <p className="flex items-center gap-2 text-sm font-medium text-black">
+                <Mic className="h-4 w-4" />
                 {t.iSpeak}
-              </label>
+              </p>
               <LanguageSelector
                 value={spokenLanguage}
                 onChange={(lang) => {
@@ -272,9 +346,10 @@ export function RoomClient({
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-black">
+              <p className="flex items-center gap-2 text-sm font-medium text-black">
+                <Headphones className="h-4 w-4" />
                 {t.iHear}
-              </label>
+              </p>
               <LanguageSelector
                 value={preferredLanguage}
                 onChange={(lang) => {
@@ -292,28 +367,55 @@ export function RoomClient({
                   {t.yourVoice}
                 </legend>
                 <div className="grid grid-cols-2 gap-2">
-                  {(["female", "male"] as const).map((gender) => (
+                  {(
+                    [
+                      { gender: "female", emoji: "👩", label: t.voiceFemale },
+                      { gender: "male", emoji: "👨", label: t.voiceMale },
+                    ] as const
+                  ).map(({ gender, emoji, label }) => (
                     <button
                       key={gender}
                       type="button"
-                      onClick={() => {
-                        setVoiceGender(gender);
-                        remember("voiceGender", gender);
-                      }}
+                      onClick={() => pickGender(gender)}
                       disabled={isJoining}
                       aria-pressed={voiceGender === gender}
-                      className={`h-10 rounded-md border text-sm cursor-pointer transition-colors ${
+                      className={cn(
+                        "flex h-12 items-center justify-center gap-2 rounded-lg border text-sm cursor-pointer transition-colors",
                         voiceGender === gender
                           ? "border-black bg-black text-white"
-                          : "border-neutral-300 bg-white text-black hover:border-neutral-500"
-                      }`}
+                          : "border-neutral-300 bg-white text-black hover:border-neutral-500",
+                      )}
                     >
-                      {gender === "female" ? t.voiceFemale : t.voiceMale}
+                      <span className="text-lg" aria-hidden>
+                        {emoji}
+                      </span>
+                      {label}
                     </button>
                   ))}
                 </div>
+                <p className="text-xs text-neutral-500">{t.voiceHint}</p>
               </fieldset>
             )}
+
+            {/* What will happen, in big */}
+            <div className="space-y-2 rounded-xl border border-neutral-200 bg-white p-4">
+              <p className="flex items-center gap-2 text-sm text-neutral-600">
+                <Mic className="h-4 w-4 shrink-0 text-black" />
+                {t.summarySpeak}
+                <span className="flex items-center gap-1.5 font-semibold text-black">
+                  <LanguageFlag code={spokenLanguage} />
+                  {languageName(spokenLanguage, uiLang)}
+                </span>
+              </p>
+              <p className="flex items-center gap-2 text-sm text-neutral-600">
+                <Headphones className="h-4 w-4 shrink-0 text-black" />
+                {t.summaryHear}
+                <span className="flex items-center gap-1.5 font-semibold text-black">
+                  <LanguageFlag code={preferredLanguage} />
+                  {languageName(preferredLanguage, uiLang)}
+                </span>
+              </p>
+            </div>
 
             {error && (
               <p className="text-sm text-red-600 text-center">{error}</p>
@@ -322,7 +424,7 @@ export function RoomClient({
             <Button
               type="submit"
               disabled={!username.trim() || isJoining || isLoadingFingerprint}
-              className="w-full bg-black text-white hover:bg-neutral-800 cursor-pointer"
+              className="h-11 w-full bg-black text-base text-white hover:bg-neutral-800 cursor-pointer"
             >
               {isJoining || isLoadingFingerprint ? (
                 <>
@@ -337,15 +439,20 @@ export function RoomClient({
               )}
             </Button>
           </form>
-
-          <p className="text-xs text-center text-neutral-500">
-            {t.summary(
-              languageName(spokenLanguage, uiLang),
-              languageName(preferredLanguage, uiLang),
-            )}
-          </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+// One step of the "how it works" picture on the join page
+function HowStep({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
+  return (
+    <div className="flex w-24 flex-col items-center gap-1.5">
+      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-neutral-200">
+        <Icon className="h-5 w-5 text-black" />
+      </span>
+      <span className="text-xs leading-tight text-neutral-600">{label}</span>
     </div>
   );
 }
