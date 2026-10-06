@@ -94,6 +94,24 @@ All documented in `.env.example` (copy to `.env.local`). Key rules:
   `POST /api/rooms/[roomId]/settings` from the dashboard or the call
   (team only, `src/lib/team-room.ts`).
 
+### Call diagnostics
+- `use-call-diagnostics.ts` notes what happens in each browser (joined with
+  provider/voice/languages/browser, languages known of the others, mic
+  open, Daily mic state and device errors, turn-taking, transcription
+  status, page errors) and sends batches every 15 s and on leave to
+  `POST /api/rooms/[roomId]/events` -> table `call_events` (cascade with
+  the room). Read with SQL when someone "wasn't heard" or "wasn't
+  translated".
+
+### Defaults that keep people audible
+- Turn-taking (floor control) starts OFF; the team can turn it on.
+- With the translated voice on, someone's original voice is lowered only
+  while their translation is actually playing (`speakingFor` / OpenAI
+  speaking), never just because they read another language.
+- Everyone repeats the language they read every 20 s (lost messages).
+- Guest screens follow the language they speak: pt, es, or en for anything
+  else (`uiLangFor`).
+
 ### Screen sharing
 - `useScreenShare()` (daily-react) in `call-ui.tsx`; button in the controls
   only where `getDisplayMedia` exists (computers), one screen at a time.

@@ -16,6 +16,7 @@ import { uiLangFor, uiText } from "@/lib/ui-text";
 import { CallControls } from "./call-controls";
 import { CaptionsBar } from "./captions-bar";
 import { EmailConfirmDialog } from "./email-confirm-dialog";
+import { useCallDiagnostics } from "./hooks/use-call-diagnostics";
 import { liveTranscriptOf, useCaptions } from "./hooks/use-captions";
 import { useFloor } from "./hooks/use-floor";
 import { useIntentDetection } from "./hooks/use-intent-detection";
@@ -215,7 +216,10 @@ export function CallUI({
   });
   const floor = useFloor({
     daily,
-    enabledByDefault: liveCaptions,
+    // Off at the start (everyone's mic open, like any call); the team can
+    // turn it on when people talk over each other. With it on by default,
+    // guests who didn't click "Speak" were never heard.
+    enabledByDefault: false,
     myName: username,
     ready: inCall && liveCaptions,
   });
@@ -286,10 +290,12 @@ export function CallUI({
   // The translated voice is playing for you right now
   const voiceSpeaking =
     voiceOn && (ttsVoice.speakingFor !== null || openAISpeaking.size > 0);
-  // With the voice on, the original voice of people who speak another
-  // language is kept low (you hear them through the translation)
+  // The original voice of someone is lowered only while their translation
+  // is actually playing. If no translation comes (they speak your language
+  // after all, or the translation fails) you keep hearing them normally.
   const volumeFor = (sessionId: string) =>
-    voiceOn && translatedSpeakers.includes(sessionId)
+    voiceOn &&
+    (ttsVoice.speakingFor === sessionId || openAISpeaking.has(sessionId))
       ? voiceVolumes.original
       : originalVolume;
 
@@ -307,6 +313,60 @@ export function CallUI({
   const sharedScreenOwner = sharedScreen
     ? (daily?.participants()[sharedScreen.session_id]?.user_name ?? "")
     : null;
+
+  // Diagnostics: what happens in this browser, to find out afterwards why
+  // someone wasn't heard or translated (read by us in the database)
+  const diagnose = useCallDiagnostics({
+    daily,
+    enabled: inCall,
+    roomId,
+    inviteToken,
+    visitorId,
+    username,
+  });
+  useEffect(() => {
+    if (!inCall) return;
+    diagnose("joined", {
+      provider: translationProvider,
+      voice: voiceEngine,
+      speaks: spokenLanguage,
+      hears: preferredLanguage,
+      team: isTeamMember,
+      browser: navigator.userAgent.slice(0, 200),
+    });
+  }, [
+    inCall,
+    diagnose,
+    translationProvider,
+    voiceEngine,
+    spokenLanguage,
+    preferredLanguage,
+    isTeamMember,
+  ]);
+  useEffect(() => {
+    if (!inCall) return;
+    const people: Record<string, { user_name?: string }> =
+      daily?.participants() ?? {};
+    diagnose("languages-known", {
+      others: Object.entries(captions.languages).map(
+        ([id, lang]) => `${people[id]?.user_name ?? id.slice(0, 6)}=${lang}`,
+      ),
+    });
+  }, [inCall, daily, diagnose, captions.languages]);
+  useEffect(() => {
+    if (inCall) diagnose("mic-open", { open: micOpen });
+  }, [inCall, diagnose, micOpen]);
+  useEffect(() => {
+    if (inCall) {
+      diagnose("turn-taking", {
+        on: floor.floorMode,
+        holder: floor.holder?.name ?? null,
+      });
+    }
+  }, [inCall, diagnose, floor.floorMode, floor.holder?.name]);
+  useEffect(() => {
+    if (inCall) diagnose("transcription", { status: engine.status });
+  }, [inCall, diagnose, engine.status]);
 
   // Recording (team starts it; everyone sees it)
   const recording = useMeetingRecording({
@@ -555,6 +615,7 @@ export function CallUI({
                 username={username}
                 isLocal
                 preferredLanguage={preferredLanguage}
+                micOffLabel={t.micOff}
               />
             )}
 
@@ -564,6 +625,9 @@ export function CallUI({
                 key={id}
                 sessionId={id}
                 originalVolume={volumeFor(id)}
+                // The language they hear in (known once they announce it)
+                preferredLanguage={captions.languages[id]}
+                micOffLabel={t.micOff}
               />
             ))}
             {openAIVoiceOn &&

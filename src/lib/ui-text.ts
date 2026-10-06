@@ -1,12 +1,15 @@
 import type { LanguageCode } from "@/lib/languages";
 
 // Interface language. The R16 team uses Portuguese; guests (Paraguayan
-// clients) see Spanish by default. Only the screens guests can reach need
-// both languages; team-only screens are written in Portuguese directly.
-export type UiLang = "pt" | "es";
+// clients) see Spanish by default, and English when they speak any other
+// language (an English-speaking guest can't use a Spanish screen). Only the
+// screens guests can reach need these; team-only screens are written in
+// Portuguese directly.
+export type UiLang = "pt" | "es" | "en";
 
 export function uiLangFor(spokenLanguage: LanguageCode): UiLang {
-  return spokenLanguage === "pt" ? "pt" : "es";
+  if (spokenLanguage === "pt" || spokenLanguage === "es") return spokenLanguage;
+  return "en";
 }
 
 const LANGUAGE_NAMES: Record<UiLang, Record<LanguageCode, string>> = {
@@ -33,6 +36,18 @@ const LANGUAGE_NAMES: Record<UiLang, Record<LanguageCode, string>> = {
     ko: "Coreano",
     zh: "Chino",
     ar: "Árabe",
+  },
+  en: {
+    en: "English",
+    es: "Spanish",
+    pt: "Portuguese",
+    fr: "French",
+    de: "German",
+    it: "Italian",
+    ja: "Japanese",
+    ko: "Korean",
+    zh: "Chinese",
+    ar: "Arabic",
   },
 };
 
@@ -115,10 +130,11 @@ const TEXT = {
     recordingYou: "você",
     voiceHear: "Ouvir a tradução por voz",
     voiceTranslatedVolume: "Voz traduzida",
-    voiceOriginalVolume: "Voz original de quem fala outra língua",
+    voiceOriginalVolume: "Voz original enquanto a tradução toca",
     voiceHeadphones:
       "Sem fone de ouvido, as vozes podem voltar pelo seu microfone (eco). Com fone fica melhor.",
     done: "Pronto",
+    micOff: "Microfone desligado",
   },
   es: {
     joinEyebrow: "[ UNIRSE A LA REUNIÓN ]",
@@ -194,10 +210,91 @@ const TEXT = {
     recordingYou: "ti",
     voiceHear: "Escuchar la traducción por voz",
     voiceTranslatedVolume: "Voz traducida",
-    voiceOriginalVolume: "Voz original de quien habla otro idioma",
+    voiceOriginalVolume: "Voz original mientras suena la traducción",
     voiceHeadphones:
       "Sin auriculares, las voces pueden volver por tu micrófono (eco). Con auriculares es mejor.",
     done: "Listo",
+    micOff: "Micrófono apagado",
+  },
+  en: {
+    joinEyebrow: "[ JOIN THE MEETING ]",
+    joinTitle: "R16 Meeting",
+    joinSubtitle: "Enter your name and choose the languages",
+    yourName: "Your name",
+    yourNamePlaceholder: "Type your name",
+    iSpeak: "I will speak",
+    iHear: "I want to hear",
+    selectLanguage: "Choose the language",
+    loading: "Loading...",
+    joining: "Joining...",
+    joinCall: "Join the call",
+    summary: (speak: string, hear: string) =>
+      `You will speak ${speak} and hear the others in ${hear}`,
+    joinFailed: "Could not join the call",
+    waitingTitle: "Waiting for the host",
+    waitingText: "We told the team you want to join. Keep this page open.",
+    waitingCancel: "Cancel",
+    entryDenied: "The host did not let you in.",
+    roomLocked: "This meeting no longer accepts new people.",
+    invalidLink: "This link is not valid or the meeting has ended.",
+    joiningCall: "Joining the call...",
+    hearingIn: (language: string) => `Hearing in ${language}`,
+    shareLink: "Share the meeting link",
+    mute: "Turn microphone off",
+    unmute: "Turn microphone on",
+    cameraOff: "Turn camera off",
+    cameraOn: "Turn camera on",
+    leave: "Leave the call",
+    speaking: "speaking...",
+    waitingForSpeech: "Waiting for someone to speak...",
+    translating: "translating...",
+    transcriptTitle: "Live transcript",
+    allSpeakers: "Everyone",
+    transcriptShow: "Show transcript",
+    transcriptHide: "Hide transcript",
+    agentTitle: "AI agent",
+    agentClear: "Clear the conversation with the agent",
+    transcriptEmptyHint:
+      "What each person says shows up here, in your language",
+    askAgent: "Ask about the meeting...",
+    secondsAgo: (s: number) => `${s} s ago`,
+    minutesAgo: (m: number) => `${m} min ago`,
+    captionsShow: "Show captions",
+    captionsHide: "Hide captions",
+    floorTake: "Speak",
+    floorRelease: "Done",
+    floorBusy: (name: string) => `${name} is speaking`,
+    floorHolder: (name: string) => `${name} has the floor`,
+    floorYouHold: "You have the floor. Click Done when you finish.",
+    floorFree: "To speak, click Speak",
+    floorLockOn: "Turn-taking on (click to turn off)",
+    floorLockOff: "Turn-taking off (click to turn on)",
+    captionsError:
+      "The transcription is not working. Try leaving and joining again.",
+    yourVoice: "Your voice in the translation",
+    voiceFemale: "Female",
+    voiceMale: "Male",
+    voiceOn: "Hearing the spoken translation (click to turn off)",
+    voiceOff: "Spoken translation off (click to hear it)",
+    floorWaitVoice: "Wait for the translation",
+    screenShare: "Share screen",
+    screenShareStop: "Stop sharing",
+    screenShareBusy: (name: string) =>
+      `${name || "Someone"} is already sharing their screen`,
+    screenSharedBy: (name: string) =>
+      `${name || "Someone"} is sharing their screen`,
+    screenSharingYou: "You are sharing your screen",
+    changeLanguages: "Change the languages (I speak / I hear)",
+    recordingCloud: "This meeting is being recorded",
+    recordingLocal: (names: string) => `Recording on ${names}'s computer`,
+    recordingYou: "your",
+    voiceHear: "Hear the spoken translation",
+    voiceTranslatedVolume: "Translated voice",
+    voiceOriginalVolume: "Original voice while the translation plays",
+    voiceHeadphones:
+      "Without headphones, voices may come back through your microphone (echo). Headphones work better.",
+    done: "Done",
+    micOff: "Microphone off",
   },
 } satisfies Record<UiLang, Record<string, unknown>>;
 

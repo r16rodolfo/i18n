@@ -50,6 +50,13 @@
       "when": 1790739484209,
       "tag": "0006_recording_cloud",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791301385955,
+      "tag": "0007_call_events",
+      "breakpoints": true
     }
   ]
 }
