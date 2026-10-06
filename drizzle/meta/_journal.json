@@ -43,6 +43,13 @@
       "when": 1790305159199,
       "tag": "0005_voice_usage",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790739484209,
+      "tag": "0006_recording_cloud",
+      "breakpoints": true
     }
   ]
 }

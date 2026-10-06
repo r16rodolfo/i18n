@@ -15,6 +15,9 @@ export const USAGE_SERVICES = [
   "tts_soniox",
   "tts_elevenlabs",
   "voice_openai",
+  // Qwen voice (branch voz-qwen); listed here so the database check keeps it
+  "voice_qwen",
+  "recording_cloud",
 ] as const;
 export type UsageService = (typeof USAGE_SERVICES)[number];
 
@@ -35,6 +38,8 @@ export const USAGE_SERVICE_INFO: Record<
   tts_soniox: { label: "Voz traduzida (Soniox)", unit: "seconds" },
   tts_elevenlabs: { label: "Voz traduzida (ElevenLabs)", unit: "characters" },
   voice_openai: { label: "Voz traduzida (OpenAI)", unit: "seconds" },
+  voice_qwen: { label: "Voz traduzida (Qwen)", unit: "seconds" },
+  recording_cloud: { label: "Gravação na nuvem (Daily)", unit: "seconds" },
 };
 
 // Services charged by time, in dollars per second of use.
@@ -52,6 +57,9 @@ const PER_SECOND: Partial<Record<UsageService, number | null>> = {
   tts_soniox: 0.7 / 3600,
   // gpt-realtime-translate: $0.034 per minute, per listener
   voice_openai: 0.034 / 60,
+  // Daily cloud recording: $0.01349 per recorded minute (wall clock, not
+  // per person) + $0.003 per minute of storage
+  recording_cloud: (0.01349 + 0.003) / 60,
 };
 
 // ElevenLabs Flash: $0.05 per 1,000 characters read

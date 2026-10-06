@@ -1,7 +1,8 @@
-import type { EntryMode } from "@/db/schema";
 import type { LanguageCode } from "@/lib/languages";
 import type { TranslationProvider } from "@/lib/translation-providers";
 import type { VoiceEngine, VoiceGender } from "@/lib/voice-options";
+
+import type { EntryMode } from "@/db/schema";
 
 export interface VideoCallProps {
   roomUrl: string;
@@ -22,6 +23,8 @@ export interface VideoCallProps {
   invitePath: string | null;
   // Lock and entry mode of the room (team members only)
   roomSettings: RoomSettings | null;
+  // Change the languages during the call
+  onChangeLanguages?: (spoken: LanguageCode, preferred: LanguageCode) => void;
 }
 
 export interface RoomSettings {

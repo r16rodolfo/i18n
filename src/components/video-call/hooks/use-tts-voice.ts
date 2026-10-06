@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { createEchoSafeOutput, type EchoSafeOutput } from "../echo-safe-output";
 import { SonioxVoiceClient } from "../soniox-voice-client";
 import type { VoicePiece } from "./use-captions";
 
@@ -24,6 +25,8 @@ interface UseTtsVoiceOptions {
   // The language you hear the others in
   language: string;
   engine: "soniox" | "elevenlabs";
+  // 0 to 1, chosen by the listener
+  volume: number;
 }
 
 interface QueuedPiece {
@@ -38,9 +41,16 @@ export function useTtsVoice({
   visitorId,
   language,
   engine,
+  volume,
 }: UseTtsVoiceOptions) {
   const [speakingFor, setSpeakingFor] = useState<string | null>(null);
   const contextRef = useRef<AudioContext | null>(null);
+  const outputRef = useRef<EchoSafeOutput | null>(null);
+  const volumeRef = useRef(volume);
+  useEffect(() => {
+    volumeRef.current = volume;
+    if (outputRef.current) outputRef.current.input.gain.value = volume;
+  }, [volume]);
   const queueRef = useRef<QueuedPiece[]>([]);
   const playingRef = useRef(false);
   // When the audio scheduled so far ends (AudioContext time)
@@ -69,7 +79,11 @@ export function useTtsVoice({
   );
 
   const getContext = useCallback(() => {
-    if (!contextRef.current) contextRef.current = new AudioContext();
+    if (!contextRef.current) {
+      contextRef.current = new AudioContext();
+      outputRef.current = createEchoSafeOutput(contextRef.current);
+      outputRef.current.input.gain.value = volumeRef.current;
+    }
     if (contextRef.current.state === "suspended") {
       contextRef.current.resume().catch(() => {});
     }
@@ -112,7 +126,7 @@ export function useTtsVoice({
         }
         const source = context.createBufferSource();
         source.buffer = buffer;
-        source.connect(context.destination);
+        source.connect(outputRef.current?.input ?? context.destination);
         const startAt = Math.max(context.currentTime + 0.02, endsAtRef.current);
         source.start(startAt);
         endsAtRef.current = startAt + buffer.duration;
@@ -216,6 +230,8 @@ export function useTtsVoice({
     abortRef.current = null;
     const context = contextRef.current;
     contextRef.current = null;
+    outputRef.current?.close();
+    outputRef.current = null;
     endsAtRef.current = 0;
     context?.close().catch(() => {});
     setSpeakingFor(null);
@@ -224,6 +240,7 @@ export function useTtsVoice({
   useEffect(() => {
     return () => {
       abortRef.current?.abort();
+      outputRef.current?.close();
       contextRef.current?.close().catch(() => {});
     };
   }, []);

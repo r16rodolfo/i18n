@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   useDaily,
@@ -19,6 +19,10 @@ import { EmailConfirmDialog } from "./email-confirm-dialog";
 import { liveTranscriptOf, useCaptions } from "./hooks/use-captions";
 import { useFloor } from "./hooks/use-floor";
 import { useIntentDetection } from "./hooks/use-intent-detection";
+import {
+  canRecordLocally,
+  useMeetingRecording,
+} from "./hooks/use-meeting-recording";
 import { useRoomEntry } from "./hooks/use-room-entry";
 import { useScribe } from "./hooks/use-scribe";
 import { useSoniox } from "./hooks/use-soniox";
@@ -28,6 +32,7 @@ import { useMeetingCost, useUsageMeter } from "./hooks/use-usage-meter";
 import { MeetingCost } from "./meeting-cost";
 import { OpenAIVoiceLink } from "./openai-voice";
 import { ParticipantTile } from "./participant-tile";
+import { RecordingIndicator } from "./recording-indicator";
 import { ScreenShareView } from "./screen-share-view";
 import { ShareModal } from "./share-modal";
 import { TranscriptSidebar } from "./transcript-sidebar";
@@ -52,6 +57,7 @@ export function CallUI({
   isTeamMember,
   invitePath,
   roomSettings,
+  onChangeLanguages,
 }: VideoCallProps) {
   const uiLang = uiLangFor(spokenLanguage);
   const t = uiText(uiLang);
@@ -89,6 +95,41 @@ export function CallUI({
       // Storage blocked: keep it on
     }
   }, []);
+  // How loud the translated voice and the original voice (of people who
+  // speak another language) are, while the translated voice is on
+  const [voiceVolumes, setVoiceVolumes] = useState({
+    translated: 1,
+    original: 0.15,
+  });
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("voiceVolumes") ?? "null");
+      if (
+        typeof saved?.translated === "number" &&
+        typeof saved?.original === "number"
+      ) {
+        setVoiceVolumes({
+          translated: saved.translated,
+          original: saved.original,
+        });
+      }
+    } catch {
+      // Storage blocked or invalid: keep the defaults
+    }
+  }, []);
+  const changeVoiceVolumes = useCallback(
+    (translated: number, original: number) => {
+      const next = { translated, original };
+      setVoiceVolumes(next);
+      try {
+        localStorage.setItem("voiceVolumes", JSON.stringify(next));
+      } catch {
+        // Storage blocked: only for this call
+      }
+    },
+    [],
+  );
+
   const toggleVoice = useCallback(() => {
     setHearVoice((current) => {
       try {
@@ -158,6 +199,7 @@ export function CallUI({
     visitorId,
     language: preferredLanguage,
     engine: voiceEngine === "elevenlabs" ? "elevenlabs" : "soniox",
+    volume: voiceVolumes.translated,
   });
   const captions = useCaptions({
     daily,
@@ -247,7 +289,9 @@ export function CallUI({
   // With the voice on, the original voice of people who speak another
   // language is kept low (you hear them through the translation)
   const volumeFor = (sessionId: string) =>
-    voiceOn && translatedSpeakers.includes(sessionId) ? 0.15 : originalVolume;
+    voiceOn && translatedSpeakers.includes(sessionId)
+      ? voiceVolumes.original
+      : originalVolume;
 
   // Screen sharing (computers only; one screen at a time). Your own screen
   // isn't shown back to you, just a note that you are sharing it.
@@ -263,6 +307,14 @@ export function CallUI({
   const sharedScreenOwner = sharedScreen
     ? (daily?.participants()[sharedScreen.session_id]?.user_name ?? "")
     : null;
+
+  // Recording (team starts it; everyone sees it)
+  const recording = useMeetingRecording({
+    daily,
+    ready: inCall,
+    roomId,
+    myName: username,
+  });
 
   // Team only: lock/entry mode of the room and guests waiting to get in
   const roomEntry = useRoomEntry(
@@ -298,6 +350,12 @@ export function CallUI({
     enabled: !isJoining && isTeamMember,
   });
 
+  // Palabra's start/stop change with the languages; read them through a ref
+  // so switching languages mid-call never makes the effect below leave and
+  // rejoin the call
+  const transcriptionRef = useRef({ startTranscription, stopTranscription });
+  transcriptionRef.current = { startTranscription, stopTranscription };
+
   // Join call and start transcription
   useEffect(() => {
     if (!daily) return;
@@ -323,7 +381,7 @@ export function CallUI({
         });
 
         if (usePalabra) {
-          await startTranscription();
+          await transcriptionRef.current.startTranscription();
         }
         setIsJoining(false);
         if (invitePath) setShowShareModal(true);
@@ -337,19 +395,11 @@ export function CallUI({
     return () => {
       const meetingState = daily.meetingState();
       if (meetingState === "joined-meeting") {
-        stopTranscription();
+        transcriptionRef.current.stopTranscription();
         daily.leave();
       }
     };
-  }, [
-    daily,
-    roomUrl,
-    token,
-    invitePath,
-    usePalabra,
-    startTranscription,
-    stopTranscription,
-  ]);
+  }, [daily, roomUrl, token, invitePath, usePalabra]);
 
   // Feed remote audio tracks to Palabra for translation
   useDailyEvent("track-started", (event) => {
@@ -400,6 +450,24 @@ export function CallUI({
     if (micOpen) startEngine();
     else stopEngine();
   }, [daily, isJoining, micOpen, liveCaptions, startEngine, stopEngine]);
+
+  // You switched the language you speak while talking: restart the
+  // transcription in the new language (it is set when a connection opens)
+  const lastSpokenRef = useRef(spokenLanguage);
+  useEffect(() => {
+    if (lastSpokenRef.current === spokenLanguage) return;
+    lastSpokenRef.current = spokenLanguage;
+    if (!liveCaptions || !micOpen || isJoining) return;
+    stopEngine();
+    startEngine();
+  }, [
+    spokenLanguage,
+    liveCaptions,
+    micOpen,
+    isJoining,
+    stopEngine,
+    startEngine,
+  ]);
 
   // Give the floor back after a long silence, so nobody stays locked out
   const { iHold, release: releaseFloor } = floor;
@@ -508,11 +576,21 @@ export function CallUI({
                   language={preferredLanguage}
                   onSpeaking={onOpenAISpeaking}
                   onConnected={onOpenAIConnected}
+                  volume={voiceVolumes.translated}
                 />
               ))}
           </div>
 
           {isTeamMember && <MeetingCost cost={meetingCost} />}
+
+          <RecordingIndicator
+            cloud={recording.cloudRecording}
+            localBy={[
+              ...(recording.localRecording ? [""] : []),
+              ...recording.othersRecordingLocally,
+            ]}
+            t={t}
+          />
 
           {isTeamMember && (
             <WaitingGuests
@@ -605,6 +683,26 @@ export function CallUI({
               }
             : undefined
         }
+        languages={
+          onChangeLanguages && !usePalabra
+            ? { spoken: spokenLanguage, onChange: onChangeLanguages }
+            : undefined
+        }
+        record={
+          isTeamMember
+            ? {
+                cloud: recording.cloudRecording,
+                local: recording.localRecording,
+                busy: recording.cloudBusy,
+                canRecordLocally: canRecordLocally(),
+                error: recording.error,
+                onStartCloud: recording.startCloud,
+                onStopCloud: recording.stopCloud,
+                onStartLocal: recording.startLocal,
+                onStopLocal: recording.stopLocal,
+              }
+            : undefined
+        }
         screenShare={
           canShareScreen
             ? {
@@ -616,7 +714,15 @@ export function CallUI({
             : undefined
         }
         voiceToggle={
-          hasVoice ? { enabled: hearVoice, onToggle: toggleVoice } : undefined
+          hasVoice
+            ? {
+                enabled: hearVoice,
+                onToggle: toggleVoice,
+                translatedVolume: voiceVolumes.translated,
+                originalVolume: voiceVolumes.original,
+                onVolumes: changeVoiceVolumes,
+              }
+            : undefined
         }
         captionsToggle={
           liveCaptions

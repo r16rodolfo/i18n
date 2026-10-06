@@ -103,6 +103,17 @@ All documented in `.env.example` (copy to `.env.local`). Key rules:
   container element, so tiles and their audio never remount). Your own
   screen is not shown back to you, only a note.
 
+### Changing languages mid-call
+- The language indicator in the controls opens "I speak / I hear"
+  (`LanguageControls`, hidden with Palabra); `room-client.tsx` owns the
+  state (`onChangeLanguages`). Hearing follows speaking unless set apart.
+- Captions re-announce `lang`, so speakers switch their Soniox connection to
+  the new target (retarget effect in `use-soniox.ts`); a change of your
+  own spoken language while talking restarts the engine (`call-ui.tsx`).
+- The Daily join effect must not depend on anything that changes with the
+  languages (Palabra's start/stop are read through a ref): otherwise a
+  language change leaves the call.
+
 ### Translated voice
 - `src/lib/voice-engines.ts` (server) + `voice-options.ts` (client-safe
   constants): `none | soniox | elevenlabs | openai`, chosen in /admin
@@ -130,8 +141,38 @@ All documented in `.env.example` (copy to `.env.local`). Key rules:
   their Daily audio track; secret from `POST .../voice-session`. Session
   time is reported by the usage meter.
 - While the voice is on, the original audio of other-language participants
-  plays at 15 %, and "Falar" shows "Aguarde a tradução" while the voice
-  is playing. Each person toggles the voice (Volume icon, remembered).
+  plays at the listener's "original voice" volume (default 15 %), and
+  "Falar" shows "Aguarde a tradução" while the voice is playing. The voice
+  button opens a small mixer: voice on/off, translated volume, original
+  volume (saved in localStorage `voiceVolumes`).
+- Echo: Chrome's echo cancellation ignores Web Audio output, so the
+  Soniox/ElevenLabs voice is played through an in-page WebRTC loopback
+  (`echo-safe-output.ts`; gain node = volume). OpenAI's voice already
+  arrives over WebRTC (volume on its `<audio>`).
+
+### Recording (team only; everyone is told)
+- Cloud (Daily): `src/lib/daily-recordings.ts` starts/stops via Daily REST
+  (turning `enable_recording: "cloud"` on for old rooms; new rooms get it at
+  creation), `POST /api/rooms/[roomId]/recording` (team) and records the
+  cost (`recording_cloud`, recording + storage per minute) on stop.
+  Downloads: `/custos` lists finished recordings per meeting ->
+  `GET /api/recordings/[id]` (team) redirects to Daily's access link.
+  Records the original voices only (translation happens in each browser).
+- On this computer: `use-meeting-recording.ts` records the tab
+  (`getDisplayMedia`, "this tab" + audio) mixed with your mic via
+  `MediaRecorder` and downloads a .webm on stop; others are told with a
+  `r16-recording` app message. Chrome/Edge desktop only.
+- `recording-indicator.tsx` shows the red notice to everyone (Daily's
+  recording state for cloud, app messages for local).
+
+### Services status (/admin)
+- `src/lib/service-health.ts` probes every outside service with the real
+  keys (free temporary tokens; one word through OpenAI) and returns
+  ok / error (with the service's own message) / no-key and the time.
+  `POST /api/admin/health` (admins) adds which checks real meetings use now
+  (`inUse`, from the active translation provider and voice engine);
+  `src/app/admin/service-status.tsx` runs it on open and on "Testar agora".
+  A new service or voice engine needs a probe there.
 
 ### Cost tracking (estimates)
 - `usage_events` (one row per measured use; `room_id` is set null when a

@@ -4,16 +4,15 @@ import { useCallback, useEffect, useState } from "react";
 
 import { ArrowRight, Hourglass, Loader2 } from "lucide-react";
 
-import type { EntryMode } from "@/db/schema";
 import type { LanguageCode } from "@/lib/languages";
 import type { TranslationProvider } from "@/lib/translation-providers";
+import { languageName, type UiLang, uiText } from "@/lib/ui-text";
 import {
   isVoiceEngine,
   isVoiceGender,
   type VoiceEngine,
   type VoiceGender,
 } from "@/lib/voice-options";
-import { languageName, type UiLang, uiText } from "@/lib/ui-text";
 
 import { LanguageSelector } from "@/components/language-selector";
 import { Button } from "@/components/ui/button";
@@ -21,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { VideoCall } from "@/components/video-call";
 
 import { useFingerprint } from "@/hooks/use-fingerprint";
+import type { EntryMode } from "@/db/schema";
 
 interface RoomClientProps {
   roomId: string;
@@ -178,6 +178,12 @@ export function RoomClient({
         isTeamMember={isTeamMember}
         invitePath={joined.invitePath}
         roomSettings={joined.roomSettings}
+        onChangeLanguages={(spoken, preferred) => {
+          setSpokenLanguage(spoken);
+          setPreferredLanguage(preferred);
+          remember("spokenLanguage", spoken);
+          remember("preferredLanguage", preferred);
+        }}
       />
     );
   }

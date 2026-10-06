@@ -2,8 +2,6 @@ import Link from "next/link";
 
 import { sql } from "drizzle-orm";
 
-import { db } from "@/db";
-import type { TeamRole } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth";
 import {
   getSelectedTranslationProvider,
@@ -28,11 +26,14 @@ import { TeamHeader } from "@/components/team-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
+import { db } from "@/db";
+import type { TeamRole } from "@/db/schema";
 import {
   changeTeamMember,
   setTranslationProvider,
   setVoiceEngine,
 } from "./actions";
+import { ServiceStatus } from "./service-status";
 
 export const metadata = { title: "Administração · R16 Meet" };
 
@@ -82,6 +83,20 @@ export default async function AdminPage({
         <h1 className="text-3xl font-light tracking-tight text-black">
           Administração
         </h1>
+
+        {/* Are the outside services answering? */}
+        <section className="space-y-4">
+          <div className="space-y-1">
+            <h2 className="text-lg font-medium text-black">
+              Status dos serviços
+            </h2>
+            <p className="text-sm text-neutral-600">
+              Testa cada serviço com as chaves configuradas. &quot;Em uso&quot;
+              são os que as reuniões usam agora.
+            </p>
+          </div>
+          <ServiceStatus />
+        </section>
 
         {/* This month's estimated cost */}
         <section className="space-y-4">
@@ -222,9 +237,9 @@ export default async function AdminPage({
           <div className="space-y-1">
             <h2 className="text-lg font-medium text-black">Voz traduzida</h2>
             <p className="text-sm text-neutral-600">
-              Além da legenda, cada pessoa ouve os outros na própria língua
-              (e pode desligar a voz na chamada). Funciona junto com a
-              tradução Soniox ou ElevenLabs + OpenAI.
+              Além da legenda, cada pessoa ouve os outros na própria língua (e
+              pode desligar a voz na chamada). Funciona junto com a tradução
+              Soniox ou ElevenLabs + OpenAI.
             </p>
           </div>
 
@@ -250,9 +265,9 @@ export default async function AdminPage({
               role="alert"
               className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
             >
-              A ElevenLabs recusou a chave para voz. No painel da ElevenLabs,
-              dê à chave a permissão de &quot;Text to Speech&quot; (e confira
-              se a ELEVENLABS_API_KEY está na Vercel).
+              A ElevenLabs recusou a chave para voz. No painel da ElevenLabs, dê
+              à chave a permissão de &quot;Text to Speech&quot; (e confira se a
+              ELEVENLABS_API_KEY está na Vercel).
             </p>
           )}
           {erro === "voz-openai" && (
@@ -260,8 +275,8 @@ export default async function AdminPage({
               role="alert"
               className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
             >
-              A OpenAI recusou a chave para voz. No painel da OpenAI, dê à
-              chave a permissão &quot;Realtime&quot; e tente de novo.
+              A OpenAI recusou a chave para voz. No painel da OpenAI, dê à chave
+              a permissão &quot;Realtime&quot; e tente de novo.
             </p>
           )}
 
