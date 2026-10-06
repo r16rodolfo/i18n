@@ -2,15 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import {
-  ArrowRight,
-  Headphones,
-  Hourglass,
-  Languages,
-  Loader2,
-  type LucideIcon,
-  Mic,
-} from "lucide-react";
+import { ArrowRight, Headphones, Hourglass, Loader2, Mic } from "lucide-react";
 
 import { isValidLanguageCode, type LanguageCode } from "@/lib/languages";
 import type { TranslationProvider } from "@/lib/translation-providers";
@@ -245,38 +237,38 @@ export function RoomClient({
 
   // Show join form
   return (
-    <div className="min-h-screen bg-neutral-100 flex items-center justify-center">
-      <div className="w-full max-w-md px-6 py-10">
-        {/* Language of this page */}
-        <div className="mb-6 flex justify-end">
-          <fieldset
-            aria-label={t.pageLanguage}
-            className="flex items-center gap-1 rounded-full border border-neutral-200 bg-white p-1"
-          >
-            {(["pt", "es", "en"] as const).map((lang) => (
-              <button
-                key={lang}
-                type="button"
-                onClick={() => {
-                  setUiLang(lang);
-                  remember("uiLang", lang);
-                }}
-                aria-pressed={uiLang === lang}
-                title={languageName(lang, lang)}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium cursor-pointer transition-colors",
-                  uiLang === lang
-                    ? "bg-black text-white"
-                    : "text-neutral-600 hover:bg-neutral-100",
-                )}
-              >
-                <LanguageFlag code={lang} className="h-3" />
-                {lang.toUpperCase()}
-              </button>
-            ))}
-          </fieldset>
-        </div>
+    <div className="relative min-h-screen bg-neutral-100 flex items-center justify-center">
+      {/* Language of this page, in the top right corner */}
+      <div className="absolute right-4 top-4">
+        <fieldset
+          aria-label={t.pageLanguage}
+          className="flex items-center gap-1 rounded-full border border-neutral-200 bg-white p-1"
+        >
+          {(["pt", "es", "en"] as const).map((lang) => (
+            <button
+              key={lang}
+              type="button"
+              onClick={() => {
+                setUiLang(lang);
+                remember("uiLang", lang);
+              }}
+              aria-pressed={uiLang === lang}
+              title={languageName(lang, lang)}
+              className={cn(
+                "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium cursor-pointer transition-colors",
+                uiLang === lang
+                  ? "bg-black text-white"
+                  : "text-neutral-600 hover:bg-neutral-100",
+              )}
+            >
+              <LanguageFlag code={lang} className="h-3" />
+              {lang.toUpperCase()}
+            </button>
+          ))}
+        </fieldset>
+      </div>
 
+      <div className="w-full max-w-md px-6 pb-10 pt-20">
         <div className="space-y-7">
           <div className="space-y-2 text-center">
             <p className="text-xs font-medium tracking-widest uppercase text-neutral-500">
@@ -286,15 +278,6 @@ export function RoomClient({
               {t.joinTitle}
             </h1>
             <p className="text-neutral-600">{t.joinSubtitle}</p>
-          </div>
-
-          {/* How it works, in one glance */}
-          <div className="flex items-start justify-center gap-2 text-center">
-            <HowStep icon={Mic} label={t.stepSpeak} />
-            <ArrowRight className="mt-3.5 h-4 w-4 shrink-0 text-neutral-300" />
-            <HowStep icon={Languages} label={t.stepTranslate} />
-            <ArrowRight className="mt-3.5 h-4 w-4 shrink-0 text-neutral-300" />
-            <HowStep icon={Headphones} label={t.stepHear} />
           </div>
 
           <form
@@ -441,18 +424,6 @@ export function RoomClient({
           </form>
         </div>
       </div>
-    </div>
-  );
-}
-
-// One step of the "how it works" picture on the join page
-function HowStep({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
-  return (
-    <div className="flex w-24 flex-col items-center gap-1.5">
-      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-neutral-200">
-        <Icon className="h-5 w-5 text-black" />
-      </span>
-      <span className="text-xs leading-tight text-neutral-600">{label}</span>
     </div>
   );
 }

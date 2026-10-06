@@ -114,7 +114,7 @@ All documented in `.env.example` (copy to `.env.local`). Key rules:
   language (guests) and has PT/ES/EN flags on top (saved as `uiLang`);
   first-time guests also start with their browser language selected.
 - Flags are drawn (`src/components/flag.tsx`, country-flag-icons): flag
-  emojis show as letters on Windows. Spanish uses Paraguay's flag.
+  emojis show as letters on Windows. Spanish uses Spain's flag.
 
 ### Screen sharing
 - `useScreenShare()` (daily-react) in `call-ui.tsx`; button in the controls
