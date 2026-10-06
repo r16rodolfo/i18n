@@ -2,11 +2,11 @@ import {
   BR,
   CN,
   DE,
+  ES,
   FR,
   IT,
   JP,
   KR,
-  PY,
   SA,
   US,
 } from "country-flag-icons/react/3x2";
@@ -14,10 +14,10 @@ import {
 import { cn } from "@/lib/utils";
 
 // The flag of each language, drawn (flag emojis show up as letters, like
-// "BR", on Windows). Spanish uses Paraguay's flag: the clients are there.
+// "BR", on Windows).
 const FLAGS = {
   pt: BR,
-  es: PY,
+  es: ES,
   en: US,
   fr: FR,
   de: DE,

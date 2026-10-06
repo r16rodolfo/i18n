@@ -1,6 +1,6 @@
 export const SUPPORTED_LANGUAGES = [
   { code: "en", name: "English", flag: "🇺🇸", targetCode: "en-us" },
-  { code: "es", name: "Spanish", flag: "🇵🇾", targetCode: "es" },
+  { code: "es", name: "Spanish", flag: "🇪🇸", targetCode: "es" },
   { code: "pt", name: "Portuguese", flag: "🇧🇷", targetCode: "pt-br" },
   { code: "fr", name: "French", flag: "🇫🇷", targetCode: "fr" },
   { code: "de", name: "German", flag: "🇩🇪", targetCode: "de" },
