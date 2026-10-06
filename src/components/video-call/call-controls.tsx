@@ -11,6 +11,8 @@ import {
   MessageSquareText,
   Mic,
   MicOff,
+  MonitorOff,
+  MonitorUp,
   PhoneOff,
   ShieldCheck,
   Video,
@@ -35,6 +37,14 @@ export interface FloorControls {
   // The translated voice of the last speaker is still playing for you:
   // wait before talking, or you would talk over it
   waitForVoice?: boolean;
+}
+
+// Share your screen (computers only). `busyWith` names someone else who is
+// already sharing: only one screen at a time.
+export interface ScreenShareToggle {
+  sharing: boolean;
+  busyWith: string | null;
+  onToggle: () => void;
 }
 
 // Hear the others in your language (translated voice), each person decides
@@ -82,6 +92,7 @@ interface CallControlsProps {
   floorToggle?: FloorToggle;
   captionsToggle?: CaptionsToggle;
   voiceToggle?: VoiceToggle;
+  screenShare?: ScreenShareToggle;
   transcriptToggle?: TranscriptToggle;
   roomControls?: RoomControls;
   uiLang: UiLang;
@@ -99,6 +110,7 @@ export function CallControls({
   floorToggle,
   captionsToggle,
   voiceToggle,
+  screenShare,
   transcriptToggle,
   roomControls,
   uiLang,
@@ -187,6 +199,30 @@ export function CallControls({
               <CaptionsOff className="w-5 h-5" />
             )}
           </button>
+        )}
+        {screenShare && (
+          <Button
+            variant={screenShare.sharing ? "destructive" : "secondary"}
+            size="icon"
+            onClick={screenShare.onToggle}
+            disabled={Boolean(screenShare.busyWith) && !screenShare.sharing}
+            title={
+              screenShare.sharing
+                ? t.screenShareStop
+                : screenShare.busyWith !== null
+                  ? t.screenShareBusy(screenShare.busyWith)
+                  : t.screenShare
+            }
+            aria-label={screenShare.sharing ? t.screenShareStop : t.screenShare}
+            aria-pressed={screenShare.sharing}
+            className="w-12 h-12 rounded-full"
+          >
+            {screenShare.sharing ? (
+              <MonitorOff className="w-5 h-5" />
+            ) : (
+              <MonitorUp className="w-5 h-5" />
+            )}
+          </Button>
         )}
         {voiceToggle && (
           <button

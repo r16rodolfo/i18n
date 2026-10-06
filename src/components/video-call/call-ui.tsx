@@ -7,8 +7,9 @@ import {
   useDailyEvent,
   useLocalParticipant,
   useParticipantIds,
+  useScreenShare,
 } from "@daily-co/daily-react";
-import { Loader2 } from "lucide-react";
+import { Loader2, MonitorUp } from "lucide-react";
 
 import { uiLangFor, uiText } from "@/lib/ui-text";
 
@@ -27,6 +28,7 @@ import { useMeetingCost, useUsageMeter } from "./hooks/use-usage-meter";
 import { MeetingCost } from "./meeting-cost";
 import { OpenAIVoiceLink } from "./openai-voice";
 import { ParticipantTile } from "./participant-tile";
+import { ScreenShareView } from "./screen-share-view";
 import { ShareModal } from "./share-modal";
 import { TranscriptSidebar } from "./transcript-sidebar";
 import type { VideoCallProps } from "./types";
@@ -247,6 +249,21 @@ export function CallUI({
   const volumeFor = (sessionId: string) =>
     voiceOn && translatedSpeakers.includes(sessionId) ? 0.15 : originalVolume;
 
+  // Screen sharing (computers only; one screen at a time). Your own screen
+  // isn't shown back to you, just a note that you are sharing it.
+  const { screens, isSharingScreen, startScreenShare, stopScreenShare } =
+    useScreenShare();
+  const sharedScreen = screens.find((screen) => !screen.local) ?? null;
+  const [canShareScreen, setCanShareScreen] = useState(false);
+  useEffect(() => {
+    setCanShareScreen(
+      typeof navigator.mediaDevices?.getDisplayMedia === "function",
+    );
+  }, []);
+  const sharedScreenOwner = sharedScreen
+    ? (daily?.participants()[sharedScreen.session_id]?.user_name ?? "")
+    : null;
+
   // Team only: lock/entry mode of the room and guests waiting to get in
   const roomEntry = useRoomEntry(
     roomId,
@@ -295,7 +312,14 @@ export function CallUI({
         // Subscribe to video + audio. Remote audio is played by the tiles,
         // unless Palabra is active (it plays the translated voice instead).
         daily.updateParticipants({
-          "*": { setSubscribedTracks: { video: true, audio: true } },
+          "*": {
+            setSubscribedTracks: {
+              video: true,
+              audio: true,
+              screenVideo: true,
+              screenAudio: true,
+            },
+          },
         });
 
         if (usePalabra) {
@@ -351,7 +375,12 @@ export function CallUI({
     if (!participant || participant.local) return;
 
     daily?.updateParticipant(participant.session_id, {
-      setSubscribedTracks: { video: true, audio: true },
+      setSubscribedTracks: {
+        video: true,
+        audio: true,
+        screenVideo: true,
+        screenAudio: true,
+      },
     });
   });
 
@@ -426,15 +455,30 @@ export function CallUI({
 
       <div className="relative flex min-h-0 flex-1">
         {/* Video grid - takes remaining space */}
-        <div className="relative min-w-0 flex-1 p-4 pb-0 overflow-hidden">
+        <div className="relative min-w-0 flex-1 p-4 pb-0 overflow-hidden flex flex-col gap-3">
+          {sharedScreen && (
+            <ScreenShareView sessionId={sharedScreen.session_id} t={t} />
+          )}
+          {isSharingScreen && !sharedScreen && (
+            <div className="flex shrink-0 items-center justify-center gap-2 rounded-lg bg-emerald-600/20 px-3 py-2 text-sm text-emerald-200">
+              <MonitorUp className="h-4 w-4" />
+              {t.screenSharingYou}
+            </div>
+          )}
+          {/* Same element with or without a shared screen, so the tiles
+              (and the audio they play) are never remounted */}
           <div
-            className={`grid gap-4 h-full ${
-              participantIds.length === 0
-                ? "grid-cols-1"
-                : participantIds.length === 1
-                  ? "grid-cols-2"
-                  : "grid-cols-2 grid-rows-2"
-            }`}
+            className={
+              sharedScreen
+                ? "flex h-28 shrink-0 gap-3 overflow-x-auto [&>*]:aspect-video [&>*]:h-full [&>*]:shrink-0"
+                : `grid gap-4 min-h-0 flex-1 ${
+                    participantIds.length === 0
+                      ? "grid-cols-1"
+                      : participantIds.length === 1
+                        ? "grid-cols-2"
+                        : "grid-cols-2 grid-rows-2"
+                  }`
+            }
           >
             {/* Local participant */}
             {localParticipant && (
@@ -558,6 +602,16 @@ export function CallUI({
             ? {
                 open: transcriptOpen,
                 onToggle: () => setTranscriptOpen((open) => !open),
+              }
+            : undefined
+        }
+        screenShare={
+          canShareScreen
+            ? {
+                sharing: isSharingScreen,
+                busyWith: sharedScreenOwner,
+                onToggle: () =>
+                  isSharingScreen ? stopScreenShare() : startScreenShare(),
               }
             : undefined
         }
