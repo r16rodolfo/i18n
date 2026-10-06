@@ -38,6 +38,8 @@ const MAX_LINES = 2;
 const CAPTION_HOLD_MS = 7000;
 // If a translation doesn't come by then, show the original words
 const TRANSLATION_TIMEOUT_MS = 5000;
+// How often everyone repeats the language they want to read
+const LANG_REPEAT_MS = 20_000;
 // Earlier pieces sent to the translator as context
 const CONTEXT_PIECES = 6;
 
@@ -164,8 +166,12 @@ export function useCaptions({
   // The same, for rendering (e.g. lowering the original voice of people
   // who speak another language)
   const [languages, setLanguages] = useState<Record<string, LanguageCode>>({});
+  // Only when something changed (the languages are repeated every 20 s)
   const syncLanguages = useCallback(() => {
-    setLanguages(Object.fromEntries(languagesRef.current));
+    const next = Object.fromEntries(languagesRef.current);
+    setLanguages((current) =>
+      JSON.stringify(current) === JSON.stringify(next) ? current : next,
+    );
   }, []);
   // Pieces waiting for their translation, to be read aloud once it comes
   const pendingVoiceRef = useRef<
@@ -547,9 +553,17 @@ export function useCaptions({
     ),
   );
 
-  // Announce the language you want, and ask the others for theirs
+  // Announce the language you want, and ask the others for theirs. Repeated
+  // every 20 s, so a lost message can't leave someone untranslated for the
+  // whole meeting.
   useEffect(() => {
-    if (ready) send({ type: "lang", lang: preferredLanguage, ask: true });
+    if (!ready) return;
+    send({ type: "lang", lang: preferredLanguage, ask: true });
+    const timer = setInterval(
+      () => send({ type: "lang", lang: preferredLanguage }),
+      LANG_REPEAT_MS,
+    );
+    return () => clearInterval(timer);
   }, [ready, preferredLanguage, send]);
 
   useEffect(() => {

@@ -185,11 +185,30 @@ export const usageEvents = pgTable(
     index("usage_events_created_at_idx").on(table.createdAt),
     check(
       "usage_events_service_check",
-      sql.raw(
-        `service in (${USAGE_SERVICES.map((s) => `'${s}'`).join(", ")})`,
-      ),
+      sql.raw(`service in (${USAGE_SERVICES.map((s) => `'${s}'`).join(", ")})`),
     ),
   ],
+).enableRLS();
+
+// What happened in each browser during a call (joined, languages, mic,
+// errors), to find out afterwards why someone wasn't heard or translated.
+// Written by the browsers themselves; read only by us (SQL).
+export const callEvents = pgTable(
+  "call_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    roomId: uuid("room_id").references(() => rooms.id, {
+      onDelete: "cascade",
+    }),
+    visitorId: text("visitor_id").notNull(),
+    username: text("username"),
+    type: text("type").notNull(),
+    data: jsonb("data").$type<Record<string, unknown>>(),
+    // When it happened in the browser
+    happenedAt: timestamp("happened_at").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("call_events_room_id_idx").on(table.roomId)],
 ).enableRLS();
 
 // Relations

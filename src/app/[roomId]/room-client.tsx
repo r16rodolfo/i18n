@@ -6,7 +6,7 @@ import { ArrowRight, Hourglass, Loader2 } from "lucide-react";
 
 import type { LanguageCode } from "@/lib/languages";
 import type { TranslationProvider } from "@/lib/translation-providers";
-import { languageName, type UiLang, uiText } from "@/lib/ui-text";
+import { languageName, type UiLang, uiLangFor, uiText } from "@/lib/ui-text";
 import {
   isVoiceEngine,
   isVoiceGender,
@@ -41,14 +41,15 @@ export function RoomClient({
 
   // The R16 team speaks Portuguese; guests are Paraguayan clients.
   const defaultLanguage: LanguageCode = isTeamMember ? "pt" : "es";
-  const uiLang: UiLang = isTeamMember ? "pt" : "es";
-  const t = uiText(uiLang);
 
   const [username, setUsername] = useState("");
   const [spokenLanguage, setSpokenLanguage] =
     useState<LanguageCode>(defaultLanguage);
   const [preferredLanguage, setPreferredLanguage] =
     useState<LanguageCode>(defaultLanguage);
+  // Guests see the page in the language they pick (Spanish by default)
+  const uiLang: UiLang = isTeamMember ? "pt" : uiLangFor(spokenLanguage);
+  const t = uiText(uiLang);
   const [voiceGender, setVoiceGender] = useState<VoiceGender>("female");
   const [isJoining, setIsJoining] = useState(false);
   const [joined, setJoined] = useState<{

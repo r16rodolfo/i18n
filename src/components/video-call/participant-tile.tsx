@@ -2,7 +2,12 @@
 
 import { useEffect, useRef } from "react";
 
-import { useAudioTrack, useVideoTrack } from "@daily-co/daily-react";
+import {
+  useAudioTrack,
+  useParticipantProperty,
+  useVideoTrack,
+} from "@daily-co/daily-react";
+import { MicOff } from "lucide-react";
 
 import { getLanguageFlag, type LanguageCode } from "@/lib/languages";
 
@@ -16,6 +21,8 @@ interface ParticipantTileProps {
    * while a translated voice plays, like a live interpreter.
    */
   originalVolume?: number;
+  // Accessible label of the "microphone off" icon
+  micOffLabel?: string;
 }
 
 export function ParticipantTile({
@@ -24,7 +31,11 @@ export function ParticipantTile({
   isLocal,
   preferredLanguage,
   originalVolume = 1,
+  micOffLabel = "Microphone off",
 }: ParticipantTileProps) {
+  // Remote people: their name in the call (was showing a code)
+  const callName = useParticipantProperty(sessionId, "user_name");
+  const name = username || callName || sessionId.slice(0, 6);
   const videoTrack = useVideoTrack(sessionId);
   const audioTrack = useAudioTrack(sessionId);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -67,15 +78,21 @@ export function ParticipantTile({
       )}
 
       <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-lg text-white text-sm">
-        {username || sessionId.slice(0, 6)}
+        {name}
         {isLocal && " (You)"}
         {preferredLanguage && ` ${getLanguageFlag(preferredLanguage)}`}
+        {audioTrack?.isOff && (
+          <MicOff
+            className="ml-1.5 inline h-3.5 w-3.5 text-red-400"
+            aria-label={micOffLabel}
+          />
+        )}
       </div>
 
       {videoTrack?.isOff && (
         <div className="absolute inset-0 flex items-center justify-center bg-neutral-800">
           <div className="w-20 h-20 rounded-full bg-neutral-700 flex items-center justify-center text-white text-3xl font-light">
-            {(username || "U")[0].toUpperCase()}
+            {(name || "U")[0].toUpperCase()}
           </div>
         </div>
       )}
