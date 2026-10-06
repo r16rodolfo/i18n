@@ -9,7 +9,9 @@ import {
 } from "@daily-co/daily-react";
 import { MicOff } from "lucide-react";
 
-import { getLanguageFlag, type LanguageCode } from "@/lib/languages";
+import type { LanguageCode } from "@/lib/languages";
+
+import { LanguageFlag } from "@/components/flag";
 
 interface ParticipantTileProps {
   sessionId: string;
@@ -80,7 +82,9 @@ export function ParticipantTile({
       <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-lg text-white text-sm">
         {name}
         {isLocal && " (You)"}
-        {preferredLanguage && ` ${getLanguageFlag(preferredLanguage)}`}
+        {preferredLanguage && (
+          <LanguageFlag code={preferredLanguage} className="ml-1.5 h-3" />
+        )}
         {audioTrack?.isOff && (
           <MicOff
             className="ml-1.5 inline h-3.5 w-3.5 text-red-400"

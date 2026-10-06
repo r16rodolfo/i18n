@@ -5,6 +5,7 @@ import { ChevronDown } from "lucide-react";
 import { type LanguageCode, SUPPORTED_LANGUAGES } from "@/lib/languages";
 import { languageName, type UiLang, uiText } from "@/lib/ui-text";
 
+import { LanguageFlag } from "@/components/flag";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -37,7 +38,7 @@ export function LanguageSelector({
           disabled={disabled}
         >
           <span className="flex items-center gap-2">
-            <span>{selectedLang?.flag}</span>
+            {selectedLang && <LanguageFlag code={selectedLang.code} />}
             <span>
               {selectedLang
                 ? languageName(selectedLang.code, uiLang)
@@ -54,7 +55,7 @@ export function LanguageSelector({
             onClick={() => onChange(lang.code as LanguageCode)}
             className="flex items-center gap-2 cursor-pointer"
           >
-            <span>{lang.flag}</span>
+            <LanguageFlag code={lang.code} />
             <span>{languageName(lang.code, uiLang)}</span>
           </DropdownMenuItem>
         ))}

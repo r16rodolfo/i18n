@@ -2,8 +2,7 @@
 
 import { UserPlus } from "lucide-react";
 
-import { getLanguageFlag } from "@/lib/languages";
-
+import { LanguageFlag } from "@/components/flag";
 import { Button } from "@/components/ui/button";
 
 import type { WaitingGuest } from "./hooks/use-room-entry";
@@ -31,7 +30,7 @@ export function WaitingGuests({
             <span className="min-w-0">
               <span className="font-medium">{guest.username}</span>{" "}
               <span aria-hidden>
-                {getLanguageFlag(guest.preferredLanguage)}
+                <LanguageFlag code={guest.preferredLanguage} />
               </span>{" "}
               quer entrar na reunião
             </span>
